@@ -448,10 +448,11 @@ select option {
   border-radius: 18px;
   border: 1px solid var(--border);
   background: rgba(255, 255, 255, .035);
-  min-height: 150px;
+  min-height: 220px;
   overflow: hidden;
   transition: .25s;
   animation: rise .45s ease both;
+  width: fit-content;
 }
 
 .room-card:hover {
