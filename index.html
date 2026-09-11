@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AURA • Room & Client Management</title>
+  <meta name="description" content="AURA - Affordable Unique Rest Accommodation Management Dashboard.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+  <div class="bg-orb orb-a"></div>
+  <div class="bg-orb orb-b"></div>
+
+  <!-- LOGIN VIEW -->
+  <section id="loginView" class="login-shell">
+    <div class="login-card glass">
+      <span class="eyebrow">AURA HOTEL MANAGEMENT</span>
+      <h1>Welcome back</h1>
+      <p class="muted">
+        Sign in to manage rooms and client records.
+      </p>
+
+      <form id="loginForm" novalidate>
+        <label>
+          Email
+          <input id="loginEmail" type="email" placeholder="abc@gmail.com" autocomplete="username">
+        </label>
+
+        <label>
+          Password
+          <div class="password-wrap">
+            <input id="loginPassword" type="password" placeholder="Enter password" autocomplete="current-password">
+            <button type="button" class="icon-btn" id="togglePassword" aria-label="Show password">
+              ◉
+            </button>
+          </div>
+        </label>
+
+        <button class="primary-btn full" type="submit">
+          Sign in <span>→</span>
+        </button>
+      </form>
+
+      <button id="forgotBtn" class="link-btn">
+        Forgot Password?
+      </button>
+
+      <div id="loginMsg" class="form-msg"></div>
+
+      <div class="demo-note">
+        AURA Hotel Management Dashboard System
+      </div>
+    </div>
+  </section>
+
+  <!-- MAIN APP VIEW -->
+  <section id="appView" class="app-shell hidden">
+    <aside class="sidebar glass">
+      <div class="side-brand">
+        <div>
+          <strong>AURA</strong>
+          <small>Affordable Unique Rest</small>
+        </div>
+      </div>
+
+      <nav>
+        <button class="nav-item active" data-section="dashboard">
+          <span>⌂</span> Dashboard
+        </button>
+        <button class="nav-item admin-only hidden" data-section="roomPrice" id="roomPriceNavBtn">
+          <span>🏷️</span> Room Price
+        </button>
+        <button class="nav-item admin-only hidden" data-section="staffAttendance" id="staffAttendanceNavBtn">
+          <span>📅</span> Staff Attendance
+        </button>
+      </nav>
+
+      <div class="side-footer">
+        <div class="status-dot">
+          <i></i> System online
+        </div>
+        <button id="logoutBtn" class="logout-btn">
+          ↪ Sign out
+        </button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div>
+          <span class="eyebrow">AURA ROOM MANAGEMENT</span>
+          <h2 id="pageTitle">Dashboard</h2>
+        </div>
+
+        <div class="topbar-logo-wrap">
+          <img src="https://lh3.googleusercontent.com/d/11rMAn1D0BGPQpiGEnwuJyLeJRtVdKf1c" alt="Hotel Logo" class="topbar-logo">
+        </div>
+
+        <div class="top-actions">
+          <span id="todayLabel" class="date-pill"></span>
+          <button class="avatar">A</button>
+        </div>
+      </header>
+
+      <!-- DASHBOARD SECTION -->
+      <section id="dashboardSection" class="page-section">
+        <div class="hero-row">
+          <div>
+            <h3>Good day 👋</h3>
+            <p class="muted">
+              Here’s the live occupancy snapshot for your 9 rooms.
+            </p>
+          </div>
+      
+          <div style="display: flex; gap: 10px; align-items: center; flex-wrap: nowrap;">
+            <button id="quickAdd" class="primary-btn">
+              ＋ Add Client
+            </button>
+            <button id="guestListBtn" class="primary-btn">
+              <span>☷</span> Guest List
+            </button>
+            <button id="masterResetBtn" class="ghost-btn" style="color: #ff6b7a; border-color: rgba(255, 107, 122, 0.3);">
+              <span>🔄</span> Reset Dashboard
+            </button>
+          </div>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat-card glass">
+            <span>Total Rooms</span>
+            <strong id="totalRooms">9</strong>
+            <small>Configured inventory</small>
+          </div>
+
+          <div class="stat-card glass">
+            <span>Occupied</span>
+            <strong id="occupiedRooms">0</strong>
+            <small>Currently allotted</small>
+          </div>
+
+          <div class="stat-card glass">
+            <span>Available</span>
+            <strong id="availableRooms">9</strong>
+            <small>Ready to allot</small>
+          </div>
+
+          <div class="stat-card glass">
+            <span>Occupancy</span>
+            <strong id="occupancyRate">0%</strong>
+            <small>Current utilization</small>
+          </div>
+        </div>
+
+        <div class="section-head">
+          <div>
+            <h3>Room status</h3>
+            <p class="muted">
+              Select a room to view its current client.
+            </p>
+          </div>
+          <span class="live-badge">
+            <i></i> LIVE
+          </span>
+        </div>
+
+        <div id="roomGrid" class="room-grid"></div>
+      </section>
+
+      <!-- NEW CLIENT FORM SECTION -->
+      <section id="clientsSection" class="page-section hidden">
+        <div class="form-card glass">
+          <div class="form-title">
+            <div class="form-icon">＋</div>
+            <div>
+              <h3>Client details</h3>
+              <p>All saved records are appended to local storage and webhooks.</p>
+            </div>
+          </div>
+
+          <form id="clientForm" class="client-form" autocomplete="off" novalidate>
+            <div class="field">
+              <label>
+                Today's Date
+                <input id="date" type="date">
+              </label>
+            </div>
+
+            <div class="field">
+              <label>
+                Allotted Room Number
+                <select id="room"></select>
+              </label>
+            </div>
+
+            <div class="form-group" style="grid-column: 1 / -1; margin-top: 10px;">
+              <label for="duration">Time</label>
+              <div style="display: grid; grid-template-columns: 1fr 130px; gap: 10px; margin-top: 9px;">
+                <input type="number" id="duration" name="duration" min="1" step="1" placeholder="Enter time">
+                <select id="durationUnit" name="durationUnit">
+                  <option value="Hour">Hour</option>
+                  <option value="Day">Day</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="divider"></div>
+
+            <div class="field">
+              <label>
+                His Name 👦🏻
+                <input id="hisName" type="text" placeholder="Enter his name">
+              </label>
+            </div>
+
+            <div class="field">
+              <label>
+                Her Name 👧🏻
+                <input id="herName" type="text" placeholder="Enter her name">
+              </label>
+            </div>
+
+            <div class="field">
+              <label>
+                His Mobile
+                <input id="hisMobile" type="tel" inputmode="numeric" placeholder="10-digit mobile" maxlength="10" oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 10);">
+              </label>
+            </div>
+
+            <div class="field">
+              <label>
+                Her Mobile
+                <input id="herMobile" type="tel" inputmode="numeric" placeholder="10-digit mobile" maxlength="10" oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 10);">
+              </label>
+            </div>
+
+            <div class="field sensitive">
+              <label>
+                His Aadhar Card Number
+                <input id="hisAadhar" type="tel" inputmode="numeric" placeholder="12-digit Aadhaar" maxlength="12" autocomplete="off" oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 12);">
+              </label>
+            </div>
+
+            <div class="field sensitive">
+              <label>
+                Her Aadhar Card Number
+                <input id="herAadhar" type="tel" inputmode="numeric" placeholder="12-digit Aadhaar" maxlength="12" autocomplete="off" oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 12);">
+              </label>
+            </div>
+
+            <div class="field">
+              <label>
+                Amount (₹)
+                <input id="amount" type="number" placeholder="Enter amount" min="0">
+              </label>
+            </div>
+
+            <div class="field">
+              <label>
+                Discount (₹)
+                <input id="discount" type="number" placeholder="Enter discount (optional)" min="0" value="0">
+              </label>
+            </div>
+
+            <div class="field">
+              <label>
+                Final Price (₹)
+                <input id="finalPrice" type="number" placeholder="Calculated final price" readonly style="background: rgba(255,255,255,0.08); font-weight: 700; color: #72e6a8;">
+              </label>
+            </div>
+
+            <div class="field">
+              <label>
+                Mode of Payment
+                <select id="paymentMode">
+                  <option value="" disabled selected>Select payment mode</option>
+                  <option value="Online">Online</option>
+                  <option value="Cash">Cash</option>
+                </select>
+              </label>
+            </div>
+
+            <!-- COMPLIMENTARY BIRTHDAY HALL CHECKBOX CONTAINER -->
+            <div id="freeHallContainer" class="field hidden" style="grid-column: 1 / -1; margin-top: 10px; padding: 14px; background: rgba(109, 140, 255, 0.08); border: 1px dashed rgba(109, 140, 255, 0.3); border-radius: 12px;">
+              <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; margin: 0; color: #8ea7ff; font-size: 13px; font-weight: 600;">
+                <input type="checkbox" id="includeFreeHall" name="includeFreeHall" style="width: 18px; height: 18px; cursor: pointer; accent-color: #6d8cff;">
+                <span id="freeHallLabel">🎉 Include Complimentary Birthday Celebration Hall (FREE with Room)</span>
+              </label>
+              <small id="freeHallNote" style="display: block; margin-top: 4px; color: #91a2b7; font-size: 11px;">
+                Checking this reserves the Hall for this guest during their stay so other guests know the Hall is unavailable.
+              </small>
+            </div>
+
+            <div class="security-note">
+              🔒 Aadhaar numbers are sensitive. Securely transmit and store them in compliance with applicable regulations.
+            </div>
+
+            <div class="form-actions">
+              <button type="reset" class="ghost-btn">Clear</button>
+              <button id="saveClientBtn" type="submit" class="primary-btn">
+                Save Client <span>→</span>
+              </button>
+            </div>
+          </form>
+
+          <div id="saveMsg" class="form-msg"></div>
+        </div>
+      </section>
+
+      <!-- GUEST LIST SECTION -->
+      <section id="guestListSection" class="page-section hidden">
+        <div class="hero-row" style="margin-bottom: 20px;">
+          <div>
+            <h3>Guest List Records 📋</h3>
+            <p class="muted">All checked-in guest details and payment history.</p>
+          </div>
+          <div style="display: flex; gap: 10px; align-items: center;">
+            <button id="printGuestListBtn" class="primary-btn" style="background: linear-gradient(135deg, #35d39a, #059669); border-color: rgba(53, 211, 154, 0.3);">
+              🖨 Print / Export PDF
+            </button>
+            <button id="backDashboardFromGuest" class="ghost-btn">
+              ← Back to Dashboard
+            </button>
+          </div>
+        </div>
+
+        <div class="form-card glass" style="max-width: 100%; overflow-x: auto; padding: 24px;">
+          <div id="guestList"></div>
+        </div>
+      </section>
+
+      <!-- ROOM PRICE MANAGEMENT SECTION (ADMIN ONLY) -->
+      <section id="roomPriceSection" class="page-section hidden">
+        <div class="form-card glass" style="max-width: 900px; margin: 0 auto;">
+          <div class="form-title" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+            <div style="display: flex; gap: 15px; align-items: center;">
+              <div class="form-icon">🏷️</div>
+              <div>
+                <h3>Room Price Settings</h3>
+                <p>Configure pricing rules by Room Type and Hours. (Admin Only)</p>
+              </div>
+            </div>
+            <button id="addPriceRuleBtn" class="primary-btn" type="button" style="font-size: 13px; padding: 10px 16px;">
+              ＋ Add Price Rule
+            </button>
+          </div>
+
+          <!-- Pricing Table -->
+          <div style="overflow-x: auto; margin-top: 24px;">
+            <table style="width: 100%; border-collapse: collapse; text-align: left;">
+              <thead>
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.15); color: #8ea7ff; font-size: 13px;">
+                  <th style="padding: 12px; text-align: center; width: 70px;">Sr. No.</th>
+                  <th style="padding: 12px;">Room Type</th>
+                  <th style="padding: 12px; text-align: center;">Hours</th>
+                  <th style="padding: 12px; text-align: right;">Price (₹)</th>
+                  <th style="padding: 12px; text-align: center; width: 120px;">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="priceRulesTableBody">
+                <!-- Dynamically filled by JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ADD/EDIT PRICE RULE MODAL -->
+      <div id="priceRuleModalOverlay" class="modal-overlay hidden">
+        <div class="modal-card glass" style="max-width: 420px; padding: 30px;">
+          <h3 id="priceModalTitle" style="margin-top: 0;">Add Price Rule</h3>
+          <form id="priceRuleForm">
+            <input type="hidden" id="priceRuleIndex" value="-1">
+            
+            <div class="field" style="margin-top: 15px;">
+              <label>
+                Room Type
+                <select id="ruleRoomType" required>
+                  <option value="AC">AC</option>
+                  <option value="Non-AC">Non-AC</option>
+                  <option value="Hall">Hall</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="field" style="margin-top: 15px;">
+              <label>
+                Hours Range (e.g. 2-4)
+                <input id="ruleHours" type="text" placeholder="e.g. 2-4" required>
+              </label>
+            </div>
+
+            <div class="field" style="margin-top: 15px;">
+              <label>
+                Price (₹)
+                <input id="rulePrice" type="number" min="0" placeholder="Enter price" required>
+              </label>
+            </div>
+
+            <div style="display: flex; gap: 12px; margin-top: 25px; justify-content: flex-end;">
+              <button type="button" class="ghost-btn" id="closePriceModalBtn">Cancel</button>
+              <button type="submit" class="primary-btn">Save Rule</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- STAFF ATTENDANCE MANAGEMENT SECTION (ADMIN ONLY) -->
+      <section id="staffAttendanceSection" class="page-section hidden">
+        <div class="form-card glass" style="max-width: 100%; margin: 0 auto; padding: 28px;">
+          <div class="hero-row" style="margin-bottom: 20px; flex-wrap: wrap; gap: 15px;">
+            <div>
+              <h3>Staff Attendance 📅</h3>
+              <p class="muted">Monthly staff attendance tracking & management</p>
+            </div>
+            <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+              <div style="display: flex; gap: 8px; align-items: center; background: rgba(255,255,255,0.05); padding: 6px 12px; border-radius: 12px; border: 1px solid var(--border);">
+                <label style="margin:0; font-size:12px; color:var(--muted);">Month:</label>
+                <select id="attendanceMonthSelect" style="margin:0; padding:6px 10px; width:auto; font-size:13px;"></select>
+                <label style="margin:0; font-size:12px; color:var(--muted);">Year:</label>
+                <select id="attendanceYearSelect" style="margin:0; padding:6px 10px; width:auto; font-size:13px;"></select>
+              </div>
+              <button id="addStaffBtn" class="primary-btn" type="button" style="font-size: 13px; padding: 10px 16px;">
+                ＋ Add Staff Member
+              </button>
+            </div>
+          </div>
+
+          <!-- Attendance Stats Summary Cards -->
+          <div class="stats-grid" style="margin: 20px 0 28px;">
+            <div class="stat-card glass">
+              <span>Total Staff</span>
+              <strong id="statTotalStaff">1</strong>
+              <small>Active employees</small>
+            </div>
+            <div class="stat-card glass">
+              <span>Days in Month</span>
+              <strong id="statMonthDays">30</strong>
+              <small id="statMonthLabel">September 2026</small>
+            </div>
+            <div class="stat-card glass">
+              <span>Total Present (P)</span>
+              <strong id="statTotalPresents" style="color: #35d39a;">0</strong>
+              <small>Total days marked P</small>
+            </div>
+            <div class="stat-card glass">
+              <span>Total Absences / Leave</span>
+              <strong id="statTotalAbsents" style="color: #ff6b7a;">0</strong>
+              <small>A, HD, L & HC totals</small>
+            </div>
+          </div>
+
+          <!-- Monthly Attendance Matrix Sheet -->
+          <div style="overflow-x: auto; background: rgba(3, 10, 20, 0.4); border-radius: 16px; padding: 16px; border: 1px solid var(--border);">
+            <div id="attendanceSheetContainer"></div>
+          </div>
+
+          <!-- Status Legend -->
+          <div style="display: flex; gap: 15px; margin-top: 20px; font-size: 12px; color: #aebbd0; align-items: center; flex-wrap: wrap;">
+            <strong>Status Legend:</strong>
+            <span style="display: flex; align-items: center; gap: 5px;"><span class="att-badge p-badge">P</span> Present</span>
+            <span style="display: flex; align-items: center; gap: 5px;"><span class="att-badge a-badge">A</span> Absent</span>
+            <span style="display: flex; align-items: center; gap: 5px;"><span class="att-badge hd-badge">HD</span> Half Day</span>
+            <span style="display: flex; align-items: center; gap: 5px;"><span class="att-badge l-badge">L</span> Leave</span>
+            <span style="display: flex; align-items: center; gap: 5px;"><span class="att-badge hc-badge">HC</span> Hotel Closed</span>
+            <small style="margin-left: auto; color: var(--muted);">💡 Tip: Click on any day cell to cycle status (P → A → HD → L → HC → Clear)</small>
+          </div>
+        </div>
+      </section>
+
+      <!-- ADD/EDIT STAFF MEMBER MODAL -->
+      <div id="staffModalOverlay" class="modal-overlay hidden">
+        <div class="modal-card glass" style="max-width: 420px; padding: 30px;">
+          <h3 id="staffModalTitle" style="margin-top: 0;">Add Staff Member</h3>
+          <form id="staffForm">
+            <input type="hidden" id="staffIdInput" value="">
+            
+            <div class="field" style="margin-top: 15px;">
+              <label>
+                Staff Name 👦🏻
+                <input id="staffNameInput" type="text" placeholder="Enter staff name" required>
+              </label>
+            </div>
+
+            <div class="field" style="margin-top: 15px;">
+              <label>
+                Role / Designation
+                <input id="staffRoleInput" type="text" placeholder="e.g. Staff Boy / Housekeeping / Reception" required>
+              </label>
+            </div>
+
+            <div class="field" style="margin-top: 15px;">
+              <label>
+                Mobile Number
+                <input id="staffMobileInput" type="tel" inputmode="numeric" placeholder="10-digit mobile" maxlength="10" oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 10);">
+              </label>
+            </div>
+
+            <div style="display: flex; gap: 12px; margin-top: 25px; justify-content: flex-end;">
+              <button type="button" class="ghost-btn" id="closeStaffModalBtn">Cancel</button>
+              <button type="submit" class="primary-btn">Save Staff</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+    </main>
+  </section>
+
+  <!-- FORGOT PASSWORD MODAL -->
+  <div id="modal" class="modal hidden">
+    <div class="modal-card glass">
+      <button id="closeModal" class="close-btn">×</button>
+      <div class="modal-icon">✉</div>
+      <h3>Reset password</h3>
+      <p class="muted">Enter the account email to request a reset link.</p>
+      <form id="forgotForm" novalidate>
+        <input id="resetEmail" type="email" value="abc@gmail.com">
+        <button class="primary-btn full" type="submit">Send reset link</button>
+      </form>
+      <div id="resetMsg" class="form-msg"></div>
+    </div>
+  </div>
+
+  <!-- CUSTOM POPUP OVERLAY -->
+  <div id="roomflowPopupOverlay" class="roomflow-popup-overlay hidden">
+    <div id="roomflowPopup" class="roomflow-popup" role="dialog" aria-modal="true" aria-labelledby="popupTitle">
+      <div id="popupIcon" class="popup-icon success-icon">✓</div>
+      <h3 id="popupTitle">Success</h3>
+      <p id="popupMessage">Operation completed successfully.</p>
+      <div id="popupActions" style="display: flex; gap: 10px; justify-content: center; margin-top: 15px;">
+        <button id="popupCancelBtn" class="ghost-btn hidden" type="button">Cancel</button>
+        <button id="popupOkBtn" class="popup-ok-btn success-ok" type="button">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- GUEST / ADMIN LOGIN OVERLAY -->
+  <div id="guestLoginOverlay" class="guest-login-overlay">
+    <div class="guest-login-backdrop"></div>
+    <div class="guest-login-card">
+      <button type="button" id="guestLoginClose" class="guest-login-close" aria-label="Close">×</button>
+      <div class="guest-login-brand">AURA</div>
+      <span class="guest-login-eyebrow">AURA MANAGEMENT</span>
+      <h1>Admin Authorization</h1>
+      <p class="guest-login-muted">Sign in with an Admin account to proceed.</p>
+      <form id="guestLoginForm" novalidate>
+        <label class="guest-login-label">
+          Username
+          <input id="guestUsername" type="text" placeholder="Enter username" autocomplete="username">
+        </label>
+        <label class="guest-login-label">
+          Password
+          <div class="guest-password-wrap">
+            <input id="guestPassword" type="password" placeholder="Enter password" autocomplete="current-password">
+            <button type="button" id="guestTogglePassword" class="guest-password-toggle" aria-label="Show password">◉</button>
+          </div>
+        </label>
+        <button type="submit" class="guest-signin-btn">
+          Sign in <span>→</span>
+        </button>
+      </form>
+      <div id="guestLoginMsg" class="guest-login-msg"></div>
+      <button type="button" id="guestLoginCancel" class="guest-login-cancel">Cancel</button>
+    </div>
+  </div>
+
+  <!-- GUEST DETAILS READ-ONLY MODAL -->
+  <div id="guestDetailsModal" class="modal hidden">
+    <div class="modal-card glass" style="width: min(520px, 100%); padding: 32px;">
+      <button id="closeGuestDetailsModal" class="close-btn">×</button>
+      <div class="modal-icon" style="color: #6d8cff;">📋</div>
+      <h3 style="margin-bottom: 5px;">Guest Record Details</h3>
+      <p class="muted" style="margin-bottom: 20px; font-size: 13px;">Read-only view of client check-in record.</p>
+      <div id="guestDetailsContent"></div>
+      <button id="okGuestDetailsModal" class="primary-btn full" style="margin-top: 20px;">Close</button>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+
+</html>
