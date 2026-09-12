@@ -73,7 +73,7 @@
         <button class="nav-item active" data-section="dashboard">
           <span>⌂</span> Dashboard
         </button>
-        <button class="nav-item admin-only hidden" data-section="roomPrice" id="roomPriceNavBtn">
+         <button class="nav-item admin-only hidden" data-section="roomPrice" id="roomPriceNavBtn">
           <span>🏷️</span> Room Price
         </button>
         <button class="nav-item admin-only hidden" data-section="staffAttendance" id="staffAttendanceNavBtn">
@@ -332,6 +332,18 @@
         <div class="form-card glass" style="max-width: 100%; overflow-x: auto; padding: 24px;">
           <div id="guestList"></div>
         </div>
+
+        <!-- GUEST DETAILS READ-ONLY MODAL -->
+        <div id="guestDetailsModal" class="modal hidden">
+          <div class="modal-card glass" style="width: min(520px, 100%); padding: 32px;">
+            <button id="closeGuestDetailsModal" class="close-btn">×</button>
+            <div class="modal-icon" style="color: #6d8cff;">📋</div>
+            <h3 style="margin-bottom: 5px;">Guest Record Details</h3>
+            <p class="muted" style="margin-bottom: 20px; font-size: 13px;">Read-only view of client check-in record.</p>
+            <div id="guestDetailsContent"></div>
+            <button id="okGuestDetailsModal" class="primary-btn full" style="margin-top: 20px;">Close</button>
+          </div>
+        </div>
       </section>
 
       <!-- ROOM PRICE MANAGEMENT SECTION (ADMIN ONLY) -->
@@ -368,47 +380,47 @@
             </table>
           </div>
         </div>
-      </section>
 
-      <!-- ADD/EDIT PRICE RULE MODAL -->
-      <div id="priceRuleModalOverlay" class="modal-overlay hidden">
-        <div class="modal-card glass" style="max-width: 420px; padding: 30px;">
-          <h3 id="priceModalTitle" style="margin-top: 0;">Add Price Rule</h3>
-          <form id="priceRuleForm">
-            <input type="hidden" id="priceRuleIndex" value="-1">
-            
-            <div class="field" style="margin-top: 15px;">
-              <label>
-                Room Type
-                <select id="ruleRoomType" required>
-                  <option value="AC">AC</option>
-                  <option value="Non-AC">Non-AC</option>
-                  <option value="Hall">Hall</option>
-                </select>
-              </label>
-            </div>
+        <!-- ADD/EDIT PRICE RULE MODAL -->
+        <div id="priceRuleModalOverlay" class="modal-overlay hidden">
+          <div class="modal-card glass" style="max-width: 420px; padding: 30px;">
+            <h3 id="priceModalTitle" style="margin-top: 0;">Add Price Rule</h3>
+            <form id="priceRuleForm">
+              <input type="hidden" id="priceRuleIndex" value="-1">
+              
+              <div class="field" style="margin-top: 15px;">
+                <label>
+                  Room Type
+                  <select id="ruleRoomType" required>
+                    <option value="AC">AC</option>
+                    <option value="Non-AC">Non-AC</option>
+                    <option value="Hall">Hall</option>
+                  </select>
+                </label>
+              </div>
 
-            <div class="field" style="margin-top: 15px;">
-              <label>
-                Hours Range (e.g. 2-4)
-                <input id="ruleHours" type="text" placeholder="e.g. 2-4" required>
-              </label>
-            </div>
+              <div class="field" style="margin-top: 15px;">
+                <label>
+                  Hours Range (e.g. 2-4)
+                  <input id="ruleHours" type="text" placeholder="e.g. 2-4" required>
+                </label>
+              </div>
 
-            <div class="field" style="margin-top: 15px;">
-              <label>
-                Price (₹)
-                <input id="rulePrice" type="number" min="0" placeholder="Enter price" required>
-              </label>
-            </div>
+              <div class="field" style="margin-top: 15px;">
+                <label>
+                  Price (₹)
+                  <input id="rulePrice" type="number" min="0" placeholder="Enter price" required>
+                </label>
+              </div>
 
-            <div style="display: flex; gap: 12px; margin-top: 25px; justify-content: flex-end;">
-              <button type="button" class="ghost-btn" id="closePriceModalBtn">Cancel</button>
-              <button type="submit" class="primary-btn">Save Rule</button>
-            </div>
-          </form>
+              <div style="display: flex; gap: 12px; margin-top: 25px; justify-content: flex-end;">
+                <button type="button" class="ghost-btn" id="closePriceModalBtn">Cancel</button>
+                <button type="submit" class="primary-btn">Save Rule</button>
+              </div>
+            </form>
+          </div>
         </div>
-      </div>
+      </section>
 
       <!-- STAFF ATTENDANCE MANAGEMENT SECTION (ADMIN ONLY) -->
       <section id="staffAttendanceSection" class="page-section hidden">
@@ -416,7 +428,7 @@
           <div class="hero-row" style="margin-bottom: 20px; flex-wrap: wrap; gap: 15px;">
             <div>
               <h3>Staff Attendance 📅</h3>
-              <p class="muted">Monthly staff attendance tracking & management</p>
+              <p class="muted">Mark and monitor monthly attendance for hotel staff. (Admin Only)</p>
             </div>
             <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
               <div style="display: flex; gap: 8px; align-items: center; background: rgba(255,255,255,0.05); padding: 6px 12px; border-radius: 12px; border: 1px solid var(--border);">
@@ -434,7 +446,7 @@
           <!-- Attendance Stats Summary Cards -->
           <div class="stats-grid" style="margin: 20px 0 28px;">
             <div class="stat-card glass">
-              <span>Total Staff</span>
+              <span>Total Staff Members</span>
               <strong id="statTotalStaff">1</strong>
               <small>Active employees</small>
             </div>
@@ -446,12 +458,12 @@
             <div class="stat-card glass">
               <span>Total Present (P)</span>
               <strong id="statTotalPresents" style="color: #35d39a;">0</strong>
-              <small>Total days marked P</small>
+              <small>Total marked present</small>
             </div>
             <div class="stat-card glass">
-              <span>Total Absences / Leave</span>
+              <span>Total Absent / Leave</span>
               <strong id="statTotalAbsents" style="color: #ff6b7a;">0</strong>
-              <small>A, HD, L & HC totals</small>
+              <small>Absences & leaves</small>
             </div>
           </div>
 
@@ -468,46 +480,49 @@
             <span style="display: flex; align-items: center; gap: 5px;"><span class="att-badge hd-badge">HD</span> Half Day</span>
             <span style="display: flex; align-items: center; gap: 5px;"><span class="att-badge l-badge">L</span> Leave</span>
             <span style="display: flex; align-items: center; gap: 5px;"><span class="att-badge hc-badge">HC</span> Hotel Closed</span>
-            <small style="margin-left: auto; color: var(--muted);">💡 Tip: Click on any day cell to cycle status (P → A → HD → L → HC → Clear)</small>
+            <small style="margin-left: auto; color: var(--muted);">💡 Tip: Click on any day cell to cycle status (P → A → HD → L → HC → Clear), then click 💾 Save under staff details</small>
+          </div>
+        </div>
+
+        <!-- ADD/EDIT STAFF MEMBER MODAL -->
+        <div id="staffModalOverlay" class="modal-overlay hidden">
+          <div class="modal-card glass" style="max-width: 420px; padding: 30px;">
+            <h3 id="staffModalTitle" style="margin-top: 0;">Add Staff Member</h3>
+            <form id="staffForm">
+              <input type="hidden" id="staffIdInput" value="">
+              
+              <div class="field" style="margin-top: 15px;">
+                <label>
+                  Staff Name 👦🏻
+                  <input id="staffNameInput" type="text" placeholder="Enter staff name" required>
+                </label>
+              </div>
+
+              <div class="field" style="margin-top: 15px;">
+                <label>
+                  Role / Designation
+                  <input id="staffRoleInput" type="text" placeholder="e.g. Staff Boy / Housekeeping / Reception" required>
+                </label>
+              </div>
+
+              <div class="field" style="margin-top: 15px;">
+                <label>
+                  Mobile Number
+                  <input id="staffMobileInput" type="tel" inputmode="numeric" placeholder="10-digit mobile" maxlength="10" oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 10);">
+                </label>
+              </div>
+
+              <div style="display: flex; gap: 12px; margin-top: 25px; justify-content: space-between; align-items: center;">
+                <button type="button" class="ghost-btn hidden" id="deleteStaffModalBtn" style="color: #ff6b7a; border-color: rgba(255, 107, 122, 0.3);">🗑️ Delete Staff</button>
+                <div style="display: flex; gap: 12px; margin-left: auto;">
+                  <button type="button" class="ghost-btn" id="closeStaffModalBtn">Cancel</button>
+                  <button type="submit" class="primary-btn">Save Staff</button>
+                </div>
+              </div>
+            </form>
           </div>
         </div>
       </section>
-
-      <!-- ADD/EDIT STAFF MEMBER MODAL -->
-      <div id="staffModalOverlay" class="modal-overlay hidden">
-        <div class="modal-card glass" style="max-width: 420px; padding: 30px;">
-          <h3 id="staffModalTitle" style="margin-top: 0;">Add Staff Member</h3>
-          <form id="staffForm">
-            <input type="hidden" id="staffIdInput" value="">
-            
-            <div class="field" style="margin-top: 15px;">
-              <label>
-                Staff Name 👦🏻
-                <input id="staffNameInput" type="text" placeholder="Enter staff name" required>
-              </label>
-            </div>
-
-            <div class="field" style="margin-top: 15px;">
-              <label>
-                Role / Designation
-                <input id="staffRoleInput" type="text" placeholder="e.g. Staff Boy / Housekeeping / Reception" required>
-              </label>
-            </div>
-
-            <div class="field" style="margin-top: 15px;">
-              <label>
-                Mobile Number
-                <input id="staffMobileInput" type="tel" inputmode="numeric" placeholder="10-digit mobile" maxlength="10" oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 10);">
-              </label>
-            </div>
-
-            <div style="display: flex; gap: 12px; margin-top: 25px; justify-content: flex-end;">
-              <button type="button" class="ghost-btn" id="closeStaffModalBtn">Cancel</button>
-              <button type="submit" class="primary-btn">Save Staff</button>
-            </div>
-          </form>
-        </div>
-      </div>
 
     </main>
   </section>
@@ -567,18 +582,6 @@
       </form>
       <div id="guestLoginMsg" class="guest-login-msg"></div>
       <button type="button" id="guestLoginCancel" class="guest-login-cancel">Cancel</button>
-    </div>
-  </div>
-
-  <!-- GUEST DETAILS READ-ONLY MODAL -->
-  <div id="guestDetailsModal" class="modal hidden">
-    <div class="modal-card glass" style="width: min(520px, 100%); padding: 32px;">
-      <button id="closeGuestDetailsModal" class="close-btn">×</button>
-      <div class="modal-icon" style="color: #6d8cff;">📋</div>
-      <h3 style="margin-bottom: 5px;">Guest Record Details</h3>
-      <p class="muted" style="margin-bottom: 20px; font-size: 13px;">Read-only view of client check-in record.</p>
-      <div id="guestDetailsContent"></div>
-      <button id="okGuestDetailsModal" class="primary-btn full" style="margin-top: 20px;">Close</button>
     </div>
   </div>
 
