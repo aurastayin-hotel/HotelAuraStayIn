@@ -317,7 +317,7 @@ select option {
   padding: 10px 0;
 }
 
-/* MAIN DASHBOARD LAYOUT */
+/* MAIN DASHBOARD LAYOUT (Restored Widescreen Dimensions) */
 .main {
   margin-left: 286px;
   width: calc(100% - 286px);
@@ -395,7 +395,7 @@ select option {
   font-size: 20px;
 }
 
-/* STATS GRID & CARDS */
+/* STATS GRID & CARDS (Restored Reference Screenshot Size) */
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -434,7 +434,7 @@ select option {
   letter-spacing: 1px;
 }
 
-/* ROOM GRID & CARDS */
+/* ROOM GRID & CARDS (Restored Reference Screenshot Size) */
 .room-grid {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
@@ -607,6 +607,7 @@ select option {
   background: rgba(255, 255, 255, .09);
 }
 
+.modal-overlay,
 .modal {
   position: fixed;
   inset: 0;
