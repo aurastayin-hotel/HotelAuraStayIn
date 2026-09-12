@@ -24,6 +24,23 @@ const CONFIG = {
 
 const $ = id => document.getElementById(id);
 
+async function postWebhook(url, payload) {
+  if (!url) return { ok: true };
+  try {
+    await fetch(url, {
+      method: "POST",
+      mode: "no-cors",
+      headers: {
+        "Content-Type": "text/plain;charset=utf-8"
+      },
+      body: JSON.stringify(payload)
+    });
+    return { ok: true };
+  } catch (error) {
+    throw new Error("Unable to connect to server.");
+  }
+}
+
 function getRoomType(roomNumber) {
   const found = CONFIG.roomList.find(r => String(r.number) === String(roomNumber));
   return found ? found.type : "Standard";
@@ -85,10 +102,15 @@ let staffList = safeGetStorage("roomflow_staff_list", [
   { id: "STF_1", name: "Raju", role: "Staff Boy", mobile: "" }
 ]);
 let attendanceRecords = safeGetStorage("roomflow_attendance_records", {});
+let syncedAttendanceRecords = safeGetStorage("roomflow_synced_attendance", {});
+let pendingAttendanceChanges = safeGetStorage("roomflow_pending_attendance_changes", {});
 let confirmCallback = null;
 let lastPopupType = "";
 let countdownInterval = null;
 let isResetFlowActive = false;
+let pendingAdminAction = null;
+let targetStaffIdForAction = null;
+let targetPriceRuleIndexForAction = null;
 let isSyncing = false;
 
 try {
@@ -404,6 +426,11 @@ function navigate(section) {
     return;
   }
 
+  // Always close section-specific popups when switching windows
+  closePriceModal();
+  closeStaffModal();
+  if ($("guestDetailsModal")) $("guestDetailsModal").classList.add("hidden");
+
   if ($("dashboardSection")) $("dashboardSection").classList.toggle("hidden", section !== "dashboard");
   if ($("clientsSection")) $("clientsSection").classList.toggle("hidden", section !== "clients");
   if ($("guestListSection")) $("guestListSection").classList.toggle("hidden", section !== "guestList");
@@ -485,6 +512,9 @@ function closeGuestLogin() {
   const guestLoginOverlay = $("guestLoginOverlay");
   if (guestLoginOverlay) guestLoginOverlay.classList.remove("active");
   if ($("guestLoginForm")) $("guestLoginForm").reset();
+  pendingAdminAction = null;
+  targetStaffIdForAction = null;
+  targetPriceRuleIndexForAction = null;
 }
 
 /* Reset Dashboard */
@@ -901,21 +931,6 @@ function validateClientForm() {
   return true;
 }
 
-async function postWebhook(url, payload) {
-  if (!url) return { demo: true, ok: true };
-  try {
-    await fetch(url, {
-      method: "POST",
-      mode: "no-cors",
-      headers: { "Content-Type": "text/plain" },
-      body: JSON.stringify(payload)
-    });
-    return { ok: true };
-  } catch (error) {
-    throw new Error("Unable to connect to server.");
-  }
-}
-
 /* Guest List Render */
 async function renderGuestList() {
   const container = $("guestList");
@@ -1146,7 +1161,15 @@ function renderPricingTable() {
 }
 
 window.editPriceRule = function(index) {
-  openPriceModal(index);
+  const currentAdmin = authenticatedAdmin || sessionStorage.getItem("roomflow_admin");
+  if (currentAdmin) {
+    openPriceModal(index);
+  } else {
+    isResetFlowActive = false;
+    pendingAdminAction = "editPriceRule";
+    targetPriceRuleIndexForAction = index;
+    openGuestLogin();
+  }
 };
 
 window.deletePriceRule = function(index) {
@@ -1346,9 +1369,12 @@ function renderStaffAttendanceSheet() {
       <tr style="border-bottom: 1px solid rgba(255,255,255,0.06);">
         <td style="text-align: left; padding: 10px 12px; white-space: nowrap; position: sticky; left: 0; background: #071322; z-index: 1;">
           <div style="font-weight: 700; color: #f7fbff; font-size: 13px;">${escapeHtml(staff.name)}</div>
-          <div style="font-size: 11px; color: var(--muted); display:flex; gap:8px; align-items:center;">
+          <div style="font-size: 11px; color: var(--muted); display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
             <span>${escapeHtml(staff.role)}</span>
+            ${staff.mobile ? `<span style="color:#72e6a8;">📱 ${escapeHtml(staff.mobile)}</span>` : ''}
+            <button type="button" onclick="window.saveStaffAttendance('${staff.id}')" style="background:none; border:none; color:#35d39a; cursor:pointer; font-size:11px; padding:0; font-weight:600;" title="Save attendance for ${escapeHtml(staff.name)} to Google Sheets">💾 Save</button>
             <button type="button" onclick="window.editStaffMember('${staff.id}')" style="background:none; border:none; color:#8ea7ff; cursor:pointer; font-size:11px; padding:0;">✏️ Edit</button>
+            <button type="button" onclick="window.deleteStaffMember('${staff.id}')" style="background:none; border:none; color:#ff6b7a; cursor:pointer; font-size:11px; padding:0;">🗑️ Delete</button>
           </div>
         </td>
         ${dayCellsHtml}
@@ -1397,26 +1423,166 @@ window.cycleAttendanceStatus = function(staffId, dateKey) {
   attendanceRecords[dateKey][staffId] = next;
   localStorage.setItem("roomflow_attendance_records", JSON.stringify(attendanceRecords));
 
-  renderStaffAttendanceSheet();
+  const changeKey = `${staffId}_${dateKey}`;
+  const syncedStatus = syncedAttendanceRecords[changeKey] || "";
 
-  const payload = {
-    action: "attendance_mark",
-    staffId: staffId,
-    date: dateKey,
-    status: next
-  };
-  if (navigator.onLine) postWebhook(CONFIG.saveWebhookUrl, payload).catch(() => {});
+  if (next !== syncedStatus) {
+    pendingAttendanceChanges[changeKey] = next;
+  } else {
+    delete pendingAttendanceChanges[changeKey];
+  }
+  localStorage.setItem("roomflow_pending_attendance_changes", JSON.stringify(pendingAttendanceChanges));
+
+  renderStaffAttendanceSheet();
+};
+
+window.saveStaffAttendance = async function(staffId) {
+  const staffObj = staffList.find(s => String(s.id) === String(staffId));
+  if (!staffObj) return;
+
+  const daysCount = getDaysInMonth(currentAttendanceYear, currentAttendanceMonth);
+  const recordsToSync = [];
+  const staffMobile = staffObj.mobile ? String(staffObj.mobile).trim() : "";
+
+  for (let day = 1; day <= daysCount; day++) {
+    const monthStr = String(currentAttendanceMonth + 1).padStart(2, '0');
+    const dayStr = String(day).padStart(2, '0');
+    const dateKey = `${currentAttendanceYear}-${monthStr}-${dayStr}`;
+
+    const rec = attendanceRecords[dateKey] || {};
+    const status = rec[staffObj.id] || "";
+
+    const changeKey = `${staffObj.id}_${dateKey}`;
+    const lastSyncedStatus = syncedAttendanceRecords[changeKey] || "";
+
+    // Only sync if this day has status AND its status differs from what is already saved in Google Sheet
+    if (status && status !== lastSyncedStatus) {
+      recordsToSync.push({
+        syncKey: changeKey,
+        action: "attendance_mark",
+        actionType: "Attendance Mark",
+        targetSheet: "Staff Attendance",
+        staffId: staffObj.id,
+        id: staffObj.id,
+        staffName: staffObj.name,
+        name: staffObj.name,
+        role: staffObj.role || "Staff Member",
+        mobile: staffMobile,
+        phone: staffMobile,
+        staffMobile: staffMobile,
+        mobileNumber: staffMobile,
+        date: dateKey,
+        status: status,
+        details: status
+      });
+    }
+  }
+
+  if (recordsToSync.length === 0) {
+    showPopup("warning", "No New Attendance to Save", `All marked attendance records for "${staffObj.name}" are already saved to the Google Sheet.`);
+    return;
+  }
+
+  try {
+    if (navigator.onLine) {
+      // Send ONLY unsynced / updated attendance records to Google Sheet
+      for (const recPayload of recordsToSync) {
+        const { syncKey, ...payloadToSend } = recPayload;
+        await postWebhook(CONFIG.saveWebhookUrl, payloadToSend);
+        syncedAttendanceRecords[syncKey] = recPayload.status;
+        delete pendingAttendanceChanges[syncKey];
+      }
+      localStorage.setItem("roomflow_synced_attendance", JSON.stringify(syncedAttendanceRecords));
+      localStorage.setItem("roomflow_pending_attendance_changes", JSON.stringify(pendingAttendanceChanges));
+
+      showPopup("success", "Attendance Saved", `Newly marked attendance for "${staffObj.name}" saved to Google Sheet successfully! (${recordsToSync.length} new day(s) mapped)`);
+    } else {
+      recordsToSync.forEach(recPayload => {
+        const { syncKey, ...payloadToSend } = recPayload;
+        pendingSync.push(payloadToSend);
+        syncedAttendanceRecords[syncKey] = recPayload.status;
+        delete pendingAttendanceChanges[syncKey];
+      });
+      localStorage.setItem("roomflow_pending_sync", JSON.stringify(pendingSync));
+      localStorage.setItem("roomflow_synced_attendance", JSON.stringify(syncedAttendanceRecords));
+      localStorage.setItem("roomflow_pending_attendance_changes", JSON.stringify(pendingAttendanceChanges));
+      showPopup("success", "Saved Locally", `Attendance for "${staffObj.name}" saved locally (${recordsToSync.length} new day(s)). Will auto-sync when internet connects.`);
+    }
+  } catch (err) {
+    recordsToSync.forEach(recPayload => {
+      const { syncKey, ...payloadToSend } = recPayload;
+      pendingSync.push(payloadToSend);
+      syncedAttendanceRecords[syncKey] = recPayload.status;
+      delete pendingAttendanceChanges[syncKey];
+    });
+    localStorage.setItem("roomflow_pending_sync", JSON.stringify(pendingSync));
+    localStorage.setItem("roomflow_synced_attendance", JSON.stringify(syncedAttendanceRecords));
+    localStorage.setItem("roomflow_pending_attendance_changes", JSON.stringify(pendingAttendanceChanges));
+    showPopup("success", "Saved Locally", `Attendance for "${staffObj.name}" saved locally (${recordsToSync.length} new day(s)). Will auto-sync when internet connects.`);
+  }
 };
 
 window.editStaffMember = function(staffId) {
   const staff = staffList.find(s => String(s.id) === String(staffId));
   if (!staff) return;
-  openStaffModal(staff);
+  const currentAdmin = authenticatedAdmin || sessionStorage.getItem("roomflow_admin");
+  if (currentAdmin) {
+    openStaffModal(staff);
+  } else {
+    isResetFlowActive = false;
+    pendingAdminAction = "editStaff";
+    targetStaffIdForAction = staffId;
+    openGuestLogin();
+  }
+};
+
+window.deleteStaffMember = function(staffId) {
+  const staff = staffList.find(s => String(s.id) === String(staffId));
+  if (!staff) return;
+
+  showPopup(
+    "warning",
+    "Delete Staff Member",
+    `Are you sure you want to delete staff member "${staff.name}" (${staff.role})?\n\nThis will remove them from your active staff list.`,
+    () => {
+      staffList = staffList.filter(s => String(s.id) !== String(staffId));
+      localStorage.setItem("roomflow_staff_list", JSON.stringify(staffList));
+
+      const staffMobile = staff.mobile ? String(staff.mobile).trim() : "";
+      const payload = {
+        action: "staff_delete",
+        targetSheet: "Staff Attendance",
+        staffId: staff.id,
+        staffName: staff.name,
+        name: staff.name,
+        role: staff.role,
+        mobile: staffMobile,
+        phone: staffMobile,
+        staffMobile: staffMobile
+      };
+
+      if (navigator.onLine) {
+        postWebhook(CONFIG.saveWebhookUrl, payload).catch(() => {
+          pendingSync.push(payload);
+          localStorage.setItem("roomflow_pending_sync", JSON.stringify(pendingSync));
+        });
+      } else {
+        pendingSync.push(payload);
+        localStorage.setItem("roomflow_pending_sync", JSON.stringify(pendingSync));
+      }
+
+      renderStaffAttendanceSheet();
+      closeStaffModal();
+      showPopup("success", "Staff Member Deleted", `Staff member "${staff.name}" removed successfully.`);
+    }
+  );
 };
 
 function openStaffModal(staffObj = null) {
   const overlay = $("staffModalOverlay");
   if (!overlay) return;
+
+  const deleteBtn = $("deleteStaffModalBtn");
 
   if (staffObj) {
     $("staffModalTitle").textContent = "Edit Staff Member";
@@ -1424,12 +1590,19 @@ function openStaffModal(staffObj = null) {
     $("staffNameInput").value = staffObj.name;
     $("staffRoleInput").value = staffObj.role;
     $("staffMobileInput").value = staffObj.mobile || "";
+
+    if (deleteBtn) {
+      deleteBtn.classList.remove("hidden");
+      deleteBtn.onclick = () => window.deleteStaffMember(staffObj.id);
+    }
   } else {
     $("staffModalTitle").textContent = "Add Staff Member";
     $("staffIdInput").value = "";
     $("staffNameInput").value = "";
     $("staffRoleInput").value = "Staff Boy";
     $("staffMobileInput").value = "";
+
+    if (deleteBtn) deleteBtn.classList.add("hidden");
   }
 
   overlay.classList.remove("hidden");
@@ -1492,10 +1665,32 @@ function bindAllEvents() {
     $("durationUnit").onchange = updateDefaultRoomPrice;
   }
 
-  if ($("addPriceRuleBtn")) $("addPriceRuleBtn").onclick = () => openPriceModal(-1);
+  if ($("addPriceRuleBtn")) {
+    $("addPriceRuleBtn").onclick = () => {
+      isResetFlowActive = false;
+      const currentAdmin = authenticatedAdmin || sessionStorage.getItem("roomflow_admin");
+      if (currentAdmin) {
+        openPriceModal(-1);
+      } else {
+        pendingAdminAction = "addPriceRule";
+        openGuestLogin();
+      }
+    };
+  }
   if ($("closePriceModalBtn")) $("closePriceModalBtn").onclick = closePriceModal;
 
-  if ($("addStaffBtn")) $("addStaffBtn").onclick = () => openStaffModal(null);
+  if ($("addStaffBtn")) {
+    $("addStaffBtn").onclick = () => {
+      isResetFlowActive = false;
+      const currentAdmin = authenticatedAdmin || sessionStorage.getItem("roomflow_admin");
+      if (currentAdmin) {
+        openStaffModal(null);
+      } else {
+        pendingAdminAction = "addStaff";
+        openGuestLogin();
+      }
+    };
+  }
   if ($("closeStaffModalBtn")) $("closeStaffModalBtn").onclick = closeStaffModal;
 
   if ($("staffForm")) {
@@ -1506,24 +1701,53 @@ function bindAllEvents() {
       const role = $("staffRoleInput").value.trim() || "Staff Member";
       const mobile = $("staffMobileInput").value.trim();
 
+      let targetStaff;
       if (sId) {
         const idx = staffList.findIndex(s => String(s.id) === String(sId));
         if (idx >= 0) {
           staffList[idx].name = name;
           staffList[idx].role = role;
           staffList[idx].mobile = mobile;
+          targetStaff = staffList[idx];
         }
       } else {
-        const newStaff = {
+        targetStaff = {
           id: "STF_" + Date.now(),
           name: name,
           role: role,
           mobile: mobile
         };
-        staffList.push(newStaff);
+        staffList.push(targetStaff);
       }
 
       localStorage.setItem("roomflow_staff_list", JSON.stringify(staffList));
+
+      if (targetStaff) {
+        const staffMobile = targetStaff.mobile ? String(targetStaff.mobile).trim() : "";
+        const payload = {
+          action: "staff_add",
+          targetSheet: "Staff Attendance",
+          staffId: targetStaff.id,
+          staffName: targetStaff.name,
+          name: targetStaff.name,
+          role: targetStaff.role,
+          mobile: staffMobile,
+          phone: staffMobile,
+          staffMobile: staffMobile,
+          mobileNumber: staffMobile
+        };
+
+        if (navigator.onLine) {
+          postWebhook(CONFIG.saveWebhookUrl, payload).catch(() => {
+            pendingSync.push(payload);
+            localStorage.setItem("roomflow_pending_sync", JSON.stringify(pendingSync));
+          });
+        } else {
+          pendingSync.push(payload);
+          localStorage.setItem("roomflow_pending_sync", JSON.stringify(pendingSync));
+        }
+      }
+
       renderStaffAttendanceSheet();
       closeStaffModal();
       showPopup("success", "Staff Saved", `Staff member "${name}" saved successfully.`);
@@ -1597,10 +1821,24 @@ function bindAllEvents() {
         }
 
         setTimeout(() => {
+          const actionToExecute = pendingAdminAction;
+          const targetStaffId = targetStaffIdForAction;
+          const targetPriceRuleIdx = targetPriceRuleIndexForAction;
+
           closeGuestLogin();
+
           if (isResetFlowActive) {
             isResetFlowActive = false;
             executeMasterReset(username);
+          } else if (actionToExecute === "addStaff") {
+            openStaffModal(null);
+          } else if (actionToExecute === "addPriceRule") {
+            openPriceModal(-1);
+          } else if (actionToExecute === "editStaff") {
+            const staffObj = staffList.find(s => String(s.id) === String(targetStaffId));
+            if (staffObj) openStaffModal(staffObj);
+          } else if (actionToExecute === "editPriceRule") {
+            if (targetPriceRuleIdx !== null && targetPriceRuleIdx >= 0) openPriceModal(targetPriceRuleIdx);
           } else {
             navigate("guestList");
           }
