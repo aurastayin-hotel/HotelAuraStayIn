@@ -2,7 +2,7 @@ const CONFIG = {
   demoEmail: "abc@gmail.com",
   demoPassword: "Ab@12",
   rooms: 9,
-  saveWebhookUrl: "https://script.google.com/macros/s/AKfycbw9_ClTwiNcXJPfl4QBc4_Xwf5dontaTs7E8H4PEApXgPb7DUMl8MwtqKTc9cNl_94e/exec",
+  saveWebhookUrl: "https://script.google.com/macros/s/AKfycbwl3XpcKdqs_d-_ZqpqFT3JcipZBrKk_PJmZnfpvJ2XPaCGV24kb09r7jNw5lBa2_cCsA/exec",
   resetWebhookUrl: "",
   admins: {
     "Praful@gmail.com": "Praful@12345",
