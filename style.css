@@ -451,6 +451,7 @@ select option {
   overflow: hidden;
   transition: .25s;
   animation: rise .45s ease both;
+  width: fit-content;
 }
 
 .room-card:hover {
