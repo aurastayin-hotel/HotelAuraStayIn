@@ -2,7 +2,7 @@ const CONFIG = {
   demoEmail: "abc@gmail.com",
   demoPassword: "Ab@12",
   rooms: 9,
-  saveWebhookUrl: "https://script.google.com/macros/s/AKfycbwl3XpcKdqs_d-_ZqpqFT3JcipZBrKk_PJmZnfpvJ2XPaCGV24kb09r7jNw5lBa2_cCsA/exec",
+  saveWebhookUrl: "https://script.google.com/macros/s/AKfycbxZWB4WWybwPCz4ksZIhZRLJEuc0BZ81RrFeImgEAU3pHEtdb708Wmo2TXblvdfK3T6iw/exec",
   resetWebhookUrl: "",
   admins: {
     "Praful@gmail.com": "Praful@12345",
@@ -104,6 +104,8 @@ let staffList = safeGetStorage("roomflow_staff_list", [
 let attendanceRecords = safeGetStorage("roomflow_attendance_records", {});
 let syncedAttendanceRecords = safeGetStorage("roomflow_synced_attendance", {});
 let pendingAttendanceChanges = safeGetStorage("roomflow_pending_attendance_changes", {});
+let pricingRules = safeGetStorage("roomflow_pricing_rules", []);
+
 let confirmCallback = null;
 let lastPopupType = "";
 let countdownInterval = null;
@@ -426,7 +428,6 @@ function navigate(section) {
     return;
   }
 
-  // Always close section-specific popups when switching windows
   closePriceModal();
   closeStaffModal();
   if ($("guestDetailsModal")) $("guestDetailsModal").classList.add("hidden");
@@ -581,10 +582,7 @@ async function executeMasterReset(adminUsername) {
   );
 }
 
-/* ============================================================
-   COUNTDOWN & LIVE OVERTIME COUNTER WITH EXPIRATION POPUP & AUDIO
-   ============================================================ */
-
+/* COUNTDOWN LOGIC */
 let notifiedExpiredRooms = new Set();
 
 function formatCountdown(milliseconds) {
@@ -702,6 +700,8 @@ function releaseRoom(roomNumber) {
     "Room Checkout",
     `${roomDisplayName}\n\nRoom key received?\n\nClick Proceed only after the room key has been received.`,
     async () => {
+      stopContinuousVoiceoverAlert();
+
       const checkoutNow = new Date();
       const checkoutDateTime = checkoutNow.toISOString();
       const checkoutDateFormatted = checkoutNow.toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" });
@@ -717,13 +717,65 @@ function releaseRoom(roomNumber) {
       localStorage.setItem("roomflow_clients", JSON.stringify(clients));
       notifiedExpiredRooms.delete(String(roomNumber));
 
+      const client = clients[index];
+      if (!client.id) {
+        client.id = "RF_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
+      }
+      const roomType = getRoomType(roomNumber);
+      const formattedRoom = String(roomNumber).toLowerCase() === "hall" || String(roomNumber).toLowerCase().includes("hall") ? roomDisplayName : `${roomNumber} (${roomType})`;
+
       const payload = {
         action: "checkout",
-        id: clients[index].id,
-        room: roomNumber,
+        targetSheet: "Clients",
+        id: client.id,
+
+        "Sr No": client.srNo || (index + 1),
+        "His Name 👦🏻": client.hisName || "-",
+        "His Mobile": client.hisMobile || "-",
+        "His Aadhaar Card Number": client.hisAadhar || "-",
+        "Her Name 👧🏻": client.herName || "-",
+        "Her Mobile": client.herMobile || "-",
+        "Her Aadhaar Card Number": client.herAadhar || "-",
+        "Amount": client.finalPrice || client.amount || 0,
+        "Mode of Payment": client.paymentMode || "-",
+        "Check-In-Date": client.checkinDateFormatted || client.checkinDate || "-",
+        "Check-In-Time": client.checkinTimeFormatted || client.checkinTime || "-",
+        "Alloted Room Number": formattedRoom,
+        "Time Duration": client.duration || "-",
+        "Hour / Day": client.durationUnit || client.timeUnit || "Hour",
+        "Check-Out-Date": checkoutDateFormatted,
+        "Check-Out-Time": checkoutTimeFormatted,
+
+        srNo: client.srNo || (index + 1),
+        hisName: client.hisName || "-",
+        hisMobile: client.hisMobile || "-",
+        hisAadhar: client.hisAadhar || "-",
+        hisAadhaar: client.hisAadhar || "-",
+        herName: client.herName || "-",
+        herMobile: client.herMobile || "-",
+        herAadhar: client.herAadhar || "-",
+        herAadhaar: client.herAadhar || "-",
+        amount: client.finalPrice || client.amount || 0,
+        finalPrice: client.finalPrice || client.amount || 0,
+        paymentMode: client.paymentMode || "-",
+        checkinDate: client.checkinDateFormatted || client.checkinDate || "-",
+        checkinDateFormatted: client.checkinDateFormatted || client.checkinDate || "-",
+        checkinTime: client.checkinTimeFormatted || client.checkinTime || "-",
+        checkinTimeFormatted: client.checkinTimeFormatted || client.checkinTime || "-",
+        allotedRoomNumber: formattedRoom,
+        allottedRoom: formattedRoom,
+        room: formattedRoom,
+        roomNumber: roomNumber,
+        roomDisplayName: roomDisplayName,
+        roomType: roomType,
+        duration: client.duration || "-",
+        durationUnit: client.durationUnit || client.timeUnit || "Hour",
         checkoutDate: checkoutDateFormatted,
+        checkoutDateFormatted: checkoutDateFormatted,
         checkoutTime: checkoutTimeFormatted,
-        checkoutDateTime: checkoutDateTime
+        checkoutTimeFormatted: checkoutTimeFormatted,
+        checkoutDateTime: checkoutDateTime,
+        status: "Checked Out"
       };
 
       try {
@@ -1106,8 +1158,6 @@ function viewClientDetails(index) {
 }
 
 /* Dynamic Room Price Management */
-let pricingRules = safeGetStorage("roomflow_pricing_rules", []);
-
 function savePricingRules() {
   localStorage.setItem("roomflow_pricing_rules", JSON.stringify(pricingRules));
 }
@@ -1418,7 +1468,7 @@ window.cycleAttendanceStatus = function(staffId, dateKey) {
   else if (current === "A") next = "HD";
   else if (current === "HD") next = "L";
   else if (current === "L") next = "HC";
-  else if (current === "HC") next = ""; // cycle back to un-marked
+  else if (current === "HC") next = "";
 
   attendanceRecords[dateKey][staffId] = next;
   localStorage.setItem("roomflow_attendance_records", JSON.stringify(attendanceRecords));
@@ -1455,7 +1505,6 @@ window.saveStaffAttendance = async function(staffId) {
     const changeKey = `${staffObj.id}_${dateKey}`;
     const lastSyncedStatus = syncedAttendanceRecords[changeKey] || "";
 
-    // Only sync if this day has status AND its status differs from what is already saved in Google Sheet
     if (status && status !== lastSyncedStatus) {
       recordsToSync.push({
         syncKey: changeKey,
@@ -1485,7 +1534,6 @@ window.saveStaffAttendance = async function(staffId) {
 
   try {
     if (navigator.onLine) {
-      // Send ONLY unsynced / updated attendance records to Google Sheet
       for (const recPayload of recordsToSync) {
         const { syncKey, ...payloadToSend } = recPayload;
         await postWebhook(CONFIG.saveWebhookUrl, payloadToSend);
@@ -1614,7 +1662,334 @@ function closeStaffModal() {
   if ($("staffForm")) $("staffForm").reset();
 }
 
-/* Event Binding System */
+/* FORM HANDLERS & EVENT BINDINGS */
+function handleLogin(event) {
+  if (event) event.preventDefault();
+  const emailEl = $("loginEmail");
+  const passEl = $("loginPassword");
+  const msgEl = $("loginMsg");
+  const inputVal = emailEl ? emailEl.value.trim() : "";
+  const password = passEl ? passEl.value : "";
+  const inputLower = inputVal.toLowerCase();
+
+  const isDemo = (inputLower === CONFIG.demoEmail.toLowerCase() && password === CONFIG.demoPassword);
+
+  let matchedAdmin = null;
+  for (const [adminUser, adminPass] of Object.entries(CONFIG.admins)) {
+    if (adminUser.toLowerCase() === inputLower && password === adminPass) {
+      matchedAdmin = adminUser;
+      break;
+    }
+  }
+
+  if (isDemo || matchedAdmin) {
+    const rememberCheckbox = $("rememberPassword");
+    if (rememberCheckbox && rememberCheckbox.checked) {
+      localStorage.setItem("roomflow_remember_login", "1");
+      localStorage.setItem("roomflow_saved_email", inputVal);
+      localStorage.setItem("roomflow_saved_password", password);
+    } else {
+      localStorage.removeItem("roomflow_remember_login");
+      localStorage.removeItem("roomflow_saved_email");
+      localStorage.removeItem("roomflow_saved_password");
+    }
+
+    sessionStorage.setItem("roomflow_logged_in", "1");
+    if (matchedAdmin) {
+      authenticatedAdmin = matchedAdmin;
+      sessionStorage.setItem("roomflow_admin", matchedAdmin);
+    } else {
+      authenticatedAdmin = null;
+      sessionStorage.removeItem("roomflow_admin");
+    }
+    if (msgEl) msgEl.textContent = "";
+    showApp();
+  } else {
+    if (msgEl) {
+      msgEl.textContent = "Incorrect email/username or password.";
+      msgEl.style.color = "#ff6b7a";
+    }
+  }
+}
+
+function handleGuestLogin(event) {
+  if (event) event.preventDefault();
+  const username = $("guestUsername") ? $("guestUsername").value.trim() : "";
+  const password = $("guestPassword") ? $("guestPassword").value : "";
+  const msgEl = $("guestLoginMsg");
+
+  if (authenticateAdmin(username, password)) {
+    sessionStorage.setItem("roomflowGuestAuthenticated", "true");
+    sessionStorage.setItem("roomflowGuestUser", username);
+
+    if (msgEl) {
+      msgEl.textContent = "Login successful.";
+      msgEl.style.color = "#72e6a8";
+    }
+
+    setTimeout(() => {
+      const actionToExecute = pendingAdminAction;
+      const targetStaffId = targetStaffIdForAction;
+      const targetPriceRuleIdx = targetPriceRuleIndexForAction;
+
+      closeGuestLogin();
+
+      if (isResetFlowActive) {
+        isResetFlowActive = false;
+        executeMasterReset(username);
+      } else if (actionToExecute === "addStaff") {
+        openStaffModal(null);
+      } else if (actionToExecute === "addPriceRule") {
+        openPriceModal(-1);
+      } else if (actionToExecute === "editStaff") {
+        const staffObj = staffList.find(s => String(s.id) === String(targetStaffId));
+        if (staffObj) openStaffModal(staffObj);
+      } else if (actionToExecute === "editPriceRule") {
+        if (targetPriceRuleIdx !== null && targetPriceRuleIdx >= 0) openPriceModal(targetPriceRuleIdx);
+      } else {
+        navigate("guestList");
+      }
+    }, 350);
+  } else {
+    if (msgEl) {
+      msgEl.textContent = "Invalid username or password.";
+      msgEl.style.color = "#ff6b7a";
+    }
+    if ($("guestPassword")) {
+      $("guestPassword").value = "";
+      $("guestPassword").focus();
+    }
+  }
+}
+
+function logout() {
+  sessionStorage.removeItem("roomflow_logged_in");
+  sessionStorage.removeItem("roomflow_admin");
+  authenticatedAdmin = null;
+  showLogin();
+}
+
+function handleForgotPassword(event) {
+  if (event) event.preventDefault();
+  const modal = $("modal");
+  if (modal) modal.classList.remove("hidden");
+}
+
+async function handleClientSubmit(event) {
+  if (event) event.preventDefault();
+
+  if (!validateClientForm()) return;
+
+  const room = $("room").value;
+  const roomDisplayName = getRoomDisplayName(room);
+  const includeFreeHall = $("includeFreeHall") ? $("includeFreeHall").checked : false;
+
+  if (clients.some(client => String(client.room) === String(room) && client.status === "Occupied")) {
+    $("room").classList.add("invalid");
+    showPopup("error", "Room Already Occupied", `${roomDisplayName} is already occupied. Please select another room.`);
+    $("room").focus();
+    return;
+  }
+
+  if (includeFreeHall && String(room) !== "Hall") {
+    const isHallBusy = clients.some(client => client.status === "Occupied" && (String(client.room) === "Hall" || client.includeFreeHall));
+    if (isHallBusy) {
+      showPopup("error", "Hall Already Occupied / Reserved", "The Celebration Hall is currently occupied or reserved for another guest stay. Please uncheck the free hall option or choose another date/time.");
+      return;
+    }
+  }
+
+  const duration = $("duration") ? Number($("duration").value) : 1;
+  const durationUnit = $("durationUnit") ? $("durationUnit").value : "Hour";
+  const amount = Number($("amount").value) || 0;
+  const discount = $("discount") ? Number($("discount").value) || 0 : 0;
+  const finalPrice = Math.max(0, amount - discount);
+  const roomType = getRoomType(room);
+
+  const now = new Date();
+  const checkinDateTime = now.toISOString();
+  const checkinDateFormatted = now.toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" });
+  const checkinTimeFormatted = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+
+  const clientId = "RF_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
+  const formattedRoom = String(room).toLowerCase().includes("hall") ? roomDisplayName : `${room} (${roomType})`;
+
+  const payload = {
+    action: "client_add",
+    targetSheet: "Clients",
+    id: clientId,
+
+    // Exact Header-Matched Keys for Google Sheets Mapping (16 columns)
+    "Sr No": clients.length + 1,
+    "His Name 👦🏻": $("hisName") ? $("hisName").value.trim() : "",
+    "His Mobile": $("hisMobile") ? $("hisMobile").value.trim() : "",
+    "His Aadhaar Card Number": $("hisAadhar") ? $("hisAadhar").value.trim() : "",
+    "Her Name 👧🏻": $("herName") ? $("herName").value.trim() : "",
+    "Her Mobile": $("herMobile") ? $("herMobile").value.trim() : "",
+    "Her Aadhaar Card Number": $("herAadhar") ? $("herAadhar").value.trim() : "",
+    "Amount": finalPrice,
+    "Mode of Payment": $("paymentMode") ? $("paymentMode").value : "",
+    "Check-In-Date": checkinDateFormatted,
+    "Check-In-Time": checkinTimeFormatted,
+    "Alloted Room Number": formattedRoom,
+    "Time Duration": duration,
+    "Hour / Day": durationUnit,
+    "Check-Out-Date": "-",
+    "Check-Out-Time": "-",
+
+    // Standardized Property Keys
+    srNo: clients.length + 1,
+    hisName: $("hisName") ? $("hisName").value.trim() : "",
+    hisMobile: $("hisMobile") ? $("hisMobile").value.trim() : "",
+    hisAadhar: $("hisAadhar") ? $("hisAadhar").value.trim() : "",
+    hisAadhaar: $("hisAadhar") ? $("hisAadhar").value.trim() : "",
+    herName: $("herName") ? $("herName").value.trim() : "",
+    herMobile: $("herMobile") ? $("herMobile").value.trim() : "",
+    herAadhar: $("herAadhar") ? $("herAadhar").value.trim() : "",
+    herAadhaar: $("herAadhar") ? $("herAadhar").value.trim() : "",
+    amount: finalPrice,
+    finalPrice: finalPrice,
+    paymentMode: $("paymentMode") ? $("paymentMode").value : "",
+    checkinDate: checkinDateFormatted,
+    checkinDateFormatted: checkinDateFormatted,
+    checkinTime: checkinTimeFormatted,
+    checkinTimeFormatted: checkinTimeFormatted,
+    allotedRoomNumber: formattedRoom,
+    allottedRoom: formattedRoom,
+    room: room,
+    roomDisplayName: roomDisplayName,
+    roomType: roomType,
+    duration: duration,
+    durationUnit: durationUnit,
+    checkoutDate: "-",
+    checkoutDateFormatted: "-",
+    checkoutTime: "-",
+    checkoutTimeFormatted: "-",
+    date: $("date") ? $("date").value : today,
+    discount: discount,
+    checkinDateTime: checkinDateTime,
+    checkoutDateTime: null,
+    status: "Occupied",
+    includeFreeHall: includeFreeHall
+  };
+
+  const saveButton = $("saveClientBtn");
+  if (saveButton) {
+    saveButton.disabled = true;
+    saveButton.innerHTML = "Saving...";
+  }
+
+  try {
+    clients.push(payload);
+    clients = deduplicateClients(clients);
+    localStorage.setItem("roomflow_clients", JSON.stringify(clients));
+
+    if (navigator.onLine) {
+      await postWebhook(CONFIG.saveWebhookUrl, payload);
+    } else {
+      pendingSync.push(payload);
+      localStorage.setItem("roomflow_pending_sync", JSON.stringify(pendingSync));
+    }
+
+    if (event.target && event.target.reset) event.target.reset();
+    if ($("date")) $("date").value = today;
+
+    render();
+    startCountdownTimer();
+
+    const freeHallText = includeFreeHall ? "\n🎉 Complimentary Birthday Hall Reserved" : "";
+    showPopup(
+      "success", 
+      "Client Saved Successfully", 
+      `The client has been successfully checked in.\n\nAllotted Room: ${roomDisplayName}\nRoom Type: ${roomType}${freeHallText}\nCheck-in Date & Time: ${checkinDateFormatted}, ${checkinTimeFormatted}\nDuration: ${duration} ${durationUnit}`
+    );
+  } catch (error) {
+    pendingSync.push(payload);
+    localStorage.setItem("roomflow_pending_sync", JSON.stringify(pendingSync));
+
+    if (event.target && event.target.reset) event.target.reset();
+    if ($("date")) $("date").value = today;
+
+    render();
+    startCountdownTimer();
+
+    showPopup(
+      "success", 
+      "Client Saved Locally", 
+      `Client checked in locally.\n\nAllotted Room: ${roomDisplayName}\nRoom Type: ${roomType}\nData will auto-sync once internet connection stabilizes.`
+    );
+  } finally {
+    if (saveButton) {
+      saveButton.disabled = false;
+      saveButton.innerHTML = "Save Client <span>→</span>";
+    }
+  }
+}
+
+function handleStaffFormSubmit(event) {
+  if (event) event.preventDefault();
+  const sId = $("staffIdInput") ? $("staffIdInput").value : "";
+  const name = $("staffNameInput") ? $("staffNameInput").value.trim() : "";
+  const role = $("staffRoleInput") ? $("staffRoleInput").value.trim() || "Staff Member" : "Staff Member";
+  const mobile = $("staffMobileInput") ? $("staffMobileInput").value.trim() : "";
+
+  if (!name) {
+    showPopup("error", "Validation Error", "Please enter staff name.");
+    return;
+  }
+
+  let targetStaff;
+  if (sId) {
+    const idx = staffList.findIndex(s => String(s.id) === String(sId));
+    if (idx >= 0) {
+      staffList[idx].name = name;
+      staffList[idx].role = role;
+      staffList[idx].mobile = mobile;
+      targetStaff = staffList[idx];
+    }
+  } else {
+    targetStaff = {
+      id: "STF_" + Date.now(),
+      name: name,
+      role: role,
+      mobile: mobile
+    };
+    staffList.push(targetStaff);
+  }
+
+  localStorage.setItem("roomflow_staff_list", JSON.stringify(staffList));
+
+  if (targetStaff) {
+    const staffMobile = targetStaff.mobile ? String(targetStaff.mobile).trim() : "";
+    const payload = {
+      action: "staff_add",
+      targetSheet: "Staff Attendance",
+      staffId: targetStaff.id,
+      staffName: targetStaff.name,
+      name: targetStaff.name,
+      role: targetStaff.role,
+      mobile: staffMobile,
+      phone: staffMobile,
+      staffMobile: staffMobile,
+      mobileNumber: staffMobile
+    };
+
+    if (navigator.onLine) {
+      postWebhook(CONFIG.saveWebhookUrl, payload).catch(() => {
+        pendingSync.push(payload);
+        localStorage.setItem("roomflow_pending_sync", JSON.stringify(pendingSync));
+      });
+    } else {
+      pendingSync.push(payload);
+      localStorage.setItem("roomflow_pending_sync", JSON.stringify(pendingSync));
+    }
+  }
+
+  renderStaffAttendanceSheet();
+  closeStaffModal();
+  showPopup("success", "Staff Saved", `Staff member "${name}" saved successfully.`);
+}
+
 function bindAllEvents() {
   document.querySelectorAll(".nav-item").forEach(button => {
     button.onclick = () => navigate(button.dataset.section);
@@ -1634,125 +2009,37 @@ function bindAllEvents() {
     };
   }
 
-  if ($("masterResetBtn")) $("masterResetBtn").onclick = () => masterResetDashboard();
-  if ($("logoutBtn")) {
-    $("logoutBtn").onclick = () => {
-      sessionStorage.removeItem("roomflow_logged_in");
-      sessionStorage.removeItem("roomflow_admin");
-      authenticatedAdmin = null;
-      showLogin();
+  if ($("masterResetBtn")) $("masterResetBtn").onclick = masterResetDashboard;
+  if ($("logoutBtn")) $("logoutBtn").onclick = logout;
+  if ($("forgotBtn")) $("forgotBtn").onclick = handleForgotPassword;
+  if ($("closeModal")) {
+    $("closeModal").onclick = () => {
+      const modal = $("modal");
+      if (modal) modal.classList.add("hidden");
     };
   }
 
-  if ($("amount")) {
-    $("amount").oninput = calculateFinalPrice;
-    $("amount").onkeyup = calculateFinalPrice;
-  }
-  if ($("discount")) {
-    $("discount").oninput = calculateFinalPrice;
-    $("discount").onkeyup = calculateFinalPrice;
-  }
-
-  if ($("room")) {
-    $("room").onchange = updateDefaultRoomPrice;
-  }
-  if ($("duration")) {
-    $("duration").oninput = updateDefaultRoomPrice;
-    $("duration").onkeyup = updateDefaultRoomPrice;
-    $("duration").onchange = updateDefaultRoomPrice;
-  }
-  if ($("durationUnit")) {
-    $("durationUnit").onchange = updateDefaultRoomPrice;
-  }
-
-  if ($("addPriceRuleBtn")) {
-    $("addPriceRuleBtn").onclick = () => {
-      isResetFlowActive = false;
-      const currentAdmin = authenticatedAdmin || sessionStorage.getItem("roomflow_admin");
-      if (currentAdmin) {
-        openPriceModal(-1);
-      } else {
-        pendingAdminAction = "addPriceRule";
-        openGuestLogin();
-      }
+  if ($("togglePassword")) {
+    $("togglePassword").onclick = () => {
+      const password = $("loginPassword");
+      if (password) password.type = password.type === "password" ? "text" : "password";
     };
   }
-  if ($("closePriceModalBtn")) $("closePriceModalBtn").onclick = closePriceModal;
 
-  if ($("addStaffBtn")) {
-    $("addStaffBtn").onclick = () => {
-      isResetFlowActive = false;
-      const currentAdmin = authenticatedAdmin || sessionStorage.getItem("roomflow_admin");
-      if (currentAdmin) {
-        openStaffModal(null);
-      } else {
-        pendingAdminAction = "addStaff";
-        openGuestLogin();
-      }
+  if ($("guestTogglePassword")) {
+    $("guestTogglePassword").onclick = () => {
+      const password = $("guestPassword");
+      if (password) password.type = password.type === "password" ? "text" : "password";
     };
   }
-  if ($("closeStaffModalBtn")) $("closeStaffModalBtn").onclick = closeStaffModal;
 
-  if ($("staffForm")) {
-    $("staffForm").onsubmit = event => {
-      event.preventDefault();
-      const sId = $("staffIdInput").value;
-      const name = $("staffNameInput").value.trim();
-      const role = $("staffRoleInput").value.trim() || "Staff Member";
-      const mobile = $("staffMobileInput").value.trim();
+  if ($("guestLoginCancel")) $("guestLoginCancel").onclick = closeGuestLogin;
+  if ($("guestLoginClose")) $("guestLoginClose").onclick = closeGuestLogin;
 
-      let targetStaff;
-      if (sId) {
-        const idx = staffList.findIndex(s => String(s.id) === String(sId));
-        if (idx >= 0) {
-          staffList[idx].name = name;
-          staffList[idx].role = role;
-          staffList[idx].mobile = mobile;
-          targetStaff = staffList[idx];
-        }
-      } else {
-        targetStaff = {
-          id: "STF_" + Date.now(),
-          name: name,
-          role: role,
-          mobile: mobile
-        };
-        staffList.push(targetStaff);
-      }
-
-      localStorage.setItem("roomflow_staff_list", JSON.stringify(staffList));
-
-      if (targetStaff) {
-        const staffMobile = targetStaff.mobile ? String(targetStaff.mobile).trim() : "";
-        const payload = {
-          action: "staff_add",
-          targetSheet: "Staff Attendance",
-          staffId: targetStaff.id,
-          staffName: targetStaff.name,
-          name: targetStaff.name,
-          role: targetStaff.role,
-          mobile: staffMobile,
-          phone: staffMobile,
-          staffMobile: staffMobile,
-          mobileNumber: staffMobile
-        };
-
-        if (navigator.onLine) {
-          postWebhook(CONFIG.saveWebhookUrl, payload).catch(() => {
-            pendingSync.push(payload);
-            localStorage.setItem("roomflow_pending_sync", JSON.stringify(pendingSync));
-          });
-        } else {
-          pendingSync.push(payload);
-          localStorage.setItem("roomflow_pending_sync", JSON.stringify(pendingSync));
-        }
-      }
-
-      renderStaffAttendanceSheet();
-      closeStaffModal();
-      showPopup("success", "Staff Saved", `Staff member "${name}" saved successfully.`);
-    };
-  }
+  if ($("loginForm")) $("loginForm").onsubmit = handleLogin;
+  if ($("guestLoginForm")) $("guestLoginForm").onsubmit = handleGuestLogin;
+  if ($("clientForm")) $("clientForm").onsubmit = handleClientSubmit;
+  if ($("staffForm")) $("staffForm").onsubmit = handleStaffFormSubmit;
 
   if ($("priceRuleForm")) {
     $("priceRuleForm").onsubmit = event => {
@@ -1802,254 +2089,59 @@ function bindAllEvents() {
     };
   }
 
-  if ($("guestLoginCancel")) $("guestLoginCancel").onclick = closeGuestLogin;
-  if ($("guestLoginClose")) $("guestLoginClose").onclick = closeGuestLogin;
+  if ($("amount")) {
+    $("amount").oninput = calculateFinalPrice;
+    $("amount").onkeyup = calculateFinalPrice;
+  }
+  if ($("discount")) {
+    $("discount").oninput = calculateFinalPrice;
+    $("discount").onkeyup = calculateFinalPrice;
+  }
 
-  if ($("guestLoginForm")) {
-    $("guestLoginForm").onsubmit = event => {
-      event.preventDefault();
-      const username = $("guestUsername").value.trim();
-      const password = $("guestPassword").value;
+  if ($("room")) {
+    $("room").onchange = () => {
+      updateDefaultRoomPrice();
+      toggleFreeHallCheckbox();
+    };
+  }
+  if ($("duration")) {
+    $("duration").oninput = updateDefaultRoomPrice;
+    $("duration").onkeyup = updateDefaultRoomPrice;
+    $("duration").onchange = updateDefaultRoomPrice;
+  }
+  if ($("durationUnit")) {
+    $("durationUnit").onchange = updateDefaultRoomPrice;
+  }
 
-      if (authenticateAdmin(username, password)) {
-        sessionStorage.setItem("roomflowGuestAuthenticated", "true");
-        sessionStorage.setItem("roomflowGuestUser", username);
-
-        if ($("guestLoginMsg")) {
-          $("guestLoginMsg").textContent = "Login successful.";
-          $("guestLoginMsg").style.color = "#72e6a8";
-        }
-
-        setTimeout(() => {
-          const actionToExecute = pendingAdminAction;
-          const targetStaffId = targetStaffIdForAction;
-          const targetPriceRuleIdx = targetPriceRuleIndexForAction;
-
-          closeGuestLogin();
-
-          if (isResetFlowActive) {
-            isResetFlowActive = false;
-            executeMasterReset(username);
-          } else if (actionToExecute === "addStaff") {
-            openStaffModal(null);
-          } else if (actionToExecute === "addPriceRule") {
-            openPriceModal(-1);
-          } else if (actionToExecute === "editStaff") {
-            const staffObj = staffList.find(s => String(s.id) === String(targetStaffId));
-            if (staffObj) openStaffModal(staffObj);
-          } else if (actionToExecute === "editPriceRule") {
-            if (targetPriceRuleIdx !== null && targetPriceRuleIdx >= 0) openPriceModal(targetPriceRuleIdx);
-          } else {
-            navigate("guestList");
-          }
-        }, 350);
+  if ($("addPriceRuleBtn")) {
+    $("addPriceRuleBtn").onclick = () => {
+      isResetFlowActive = false;
+      const currentAdmin = authenticatedAdmin || sessionStorage.getItem("roomflow_admin");
+      if (currentAdmin) {
+        openPriceModal(-1);
       } else {
-        if ($("guestLoginMsg")) {
-          $("guestLoginMsg").textContent = "Invalid username or password.";
-          $("guestLoginMsg").style.color = "#ff6b7a";
-        }
-        if ($("guestPassword")) {
-          $("guestPassword").value = "";
-          $("guestPassword").focus();
-        }
+        pendingAdminAction = "addPriceRule";
+        openGuestLogin();
       }
     };
   }
+  if ($("closePriceModalBtn")) $("closePriceModalBtn").onclick = closePriceModal;
 
-  if ($("togglePassword")) {
-    $("togglePassword").onclick = () => {
-      const password = $("loginPassword");
-      if (password) password.type = password.type === "password" ? "text" : "password";
-    };
-  }
-
-  // LOGIN FORM
-  if ($("loginForm")) {
-    $("loginForm").noValidate = true;
-
-    $("loginForm").onsubmit = event => {
-      event.preventDefault();
-      const inputVal = $("loginEmail") ? $("loginEmail").value.trim() : "";
-      const password = $("loginPassword") ? $("loginPassword").value : "";
-      const inputLower = inputVal.toLowerCase();
-
-      const isDemo = (inputLower === CONFIG.demoEmail.toLowerCase() && password === CONFIG.demoPassword);
-
-      let matchedAdmin = null;
-      for (const [adminUser, adminPass] of Object.entries(CONFIG.admins)) {
-        if (adminUser.toLowerCase() === inputLower && password === adminPass) {
-          matchedAdmin = adminUser;
-          break;
-        }
-      }
-
-      if (isDemo || matchedAdmin) {
-        const rememberCheckbox = $("rememberPassword");
-        if (rememberCheckbox && rememberCheckbox.checked) {
-          localStorage.setItem("roomflow_remember_login", "1");
-          localStorage.setItem("roomflow_saved_email", inputVal);
-          localStorage.setItem("roomflow_saved_password", password);
-        } else {
-          localStorage.removeItem("roomflow_remember_login");
-          localStorage.removeItem("roomflow_saved_email");
-          localStorage.removeItem("roomflow_saved_password");
-        }
-
-        sessionStorage.setItem("roomflow_logged_in", "1");
-        if (matchedAdmin) {
-          authenticatedAdmin = matchedAdmin;
-          sessionStorage.setItem("roomflow_admin", matchedAdmin);
-        } else {
-          authenticatedAdmin = null;
-          sessionStorage.removeItem("roomflow_admin");
-        }
-        if ($("loginMsg")) $("loginMsg").textContent = "";
-        showApp();
+  if ($("addStaffBtn")) {
+    $("addStaffBtn").onclick = () => {
+      isResetFlowActive = false;
+      const currentAdmin = authenticatedAdmin || sessionStorage.getItem("roomflow_admin");
+      if (currentAdmin) {
+        openStaffModal(null);
       } else {
-        if ($("loginMsg")) {
-          $("loginMsg").textContent = "Incorrect email/username or password.";
-          $("loginMsg").style.color = "#ff6b7a";
-        }
+        pendingAdminAction = "addStaff";
+        openGuestLogin();
       }
     };
   }
-
-  // SAVE CLIENT FORM WITH FREE BIRTHDAY HALL RESERVATION CHECK
-  if ($("clientForm")) {
-    $("clientForm").onsubmit = async event => {
-      event.preventDefault();
-
-      if (!validateClientForm()) return;
-
-      const room = $("room").value;
-      const roomDisplayName = getRoomDisplayName(room);
-      const includeFreeHall = $("includeFreeHall") ? $("includeFreeHall").checked : false;
-
-      if (clients.some(client => String(client.room) === String(room) && client.status === "Occupied")) {
-        $("room").classList.add("invalid");
-        showPopup("error", "Room Already Occupied", `${roomDisplayName} is already occupied. Please select another room.`);
-        $("room").focus();
-        return;
-      }
-
-      if (includeFreeHall && String(room) !== "Hall") {
-        const isHallBusy = clients.some(client => client.status === "Occupied" && (String(client.room) === "Hall" || client.includeFreeHall));
-        if (isHallBusy) {
-          showPopup("error", "Hall Already Occupied / Reserved", "The Celebration Hall is currently occupied or reserved for another guest stay. Please uncheck the free hall option or choose another date/time.");
-          return;
-        }
-      }
-
-      const duration = $("duration") ? Number($("duration").value) : 1;
-      const durationUnit = $("durationUnit") ? $("durationUnit").value : "Hour";
-      const amount = Number($("amount").value) || 0;
-      const discount = $("discount") ? Number($("discount").value) || 0 : 0;
-      const finalPrice = Math.max(0, amount - discount);
-      const roomType = getRoomType(room);
-
-      const now = new Date();
-      const checkinDateTime = now.toISOString();
-      const checkinDateFormatted = now.toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" });
-      const checkinTimeFormatted = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
-
-      const clientId = "RF_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
-
-      const payload = {
-        id: clientId,
-        srNo: clients.length + 1,
-        hisName: $("hisName").value.trim(),
-        hisMobile: $("hisMobile").value.trim(),
-        hisAadhar: $("hisAadhar").value.trim(),
-        herName: $("herName").value.trim(),
-        herMobile: $("herMobile") ? $("herMobile").value.trim() : "",
-        herAadhar: $("herAadhar").value.trim(),
-        amount: finalPrice,
-        paymentMode: $("paymentMode").value,
-        checkinDateFormatted: checkinDateFormatted,
-        checkinTimeFormatted: checkinTimeFormatted,
-        room: room,
-        duration: duration,
-        durationUnit: durationUnit,
-        checkoutDateFormatted: "-",
-        checkoutTimeFormatted: "-",
-        date: $("date").value,
-        discount: discount,
-        finalPrice: finalPrice,
-        roomType: roomType,
-        checkinDateTime: checkinDateTime,
-        checkoutDateTime: null,
-        status: "Occupied",
-        includeFreeHall: includeFreeHall
-      };
-
-      const saveButton = $("saveClientBtn");
-      if (saveButton) {
-        saveButton.disabled = true;
-        saveButton.innerHTML = "Saving...";
-      }
-
-      try {
-        clients.push(payload);
-        clients = deduplicateClients(clients);
-        localStorage.setItem("roomflow_clients", JSON.stringify(clients));
-
-        if (navigator.onLine) {
-          await postWebhook(CONFIG.saveWebhookUrl, payload);
-        } else {
-          pendingSync.push(payload);
-          localStorage.setItem("roomflow_pending_sync", JSON.stringify(pendingSync));
-        }
-
-        event.target.reset();
-        if ($("date")) $("date").value = today;
-
-        render();
-        startCountdownTimer();
-
-        const freeHallText = includeFreeHall ? "\n🎉 Complimentary Birthday Hall Reserved" : "";
-        showPopup(
-          "success", 
-          "Client Saved Successfully", 
-          `The client has been successfully checked in.\n\nAllotted Room: ${roomDisplayName}\nRoom Type: ${roomType}${freeHallText}\nCheck-in Date & Time: ${checkinDateFormatted}, ${checkinTimeFormatted}\nDuration: ${duration} ${durationUnit}`
-        );
-      } catch (error) {
-        pendingSync.push(payload);
-        localStorage.setItem("roomflow_pending_sync", JSON.stringify(pendingSync));
-
-        event.target.reset();
-        if ($("date")) $("date").value = today;
-
-        render();
-        startCountdownTimer();
-
-        showPopup(
-          "success", 
-          "Client Saved Locally", 
-          `Client checked in locally.\n\nAllotted Room: ${roomDisplayName}\nRoom Type: ${roomType}\nData will auto-sync once internet connection stabilizes.`
-        );
-      } finally {
-        if (saveButton) {
-          saveButton.disabled = false;
-          saveButton.innerHTML = "Save Client <span>→</span>";
-        }
-      }
-    };
-  }
+  if ($("closeStaffModalBtn")) $("closeStaffModalBtn").onclick = closeStaffModal;
 }
 
-/* Initialization */
-loadRememberedLogin();
-
-document.addEventListener("DOMContentLoaded", () => {
-  bindAllEvents();
-  if (sessionStorage.getItem("roomflow_logged_in") === "1") {
-    showApp();
-  } else {
-    render();
-  }
-});
-
-/* Dynamic Free Hall Checkbox Visibility & Availability Helper */
 function toggleFreeHallCheckbox() {
   const roomSelect = $("room");
   const container = $("freeHallContainer");
@@ -2088,9 +2180,15 @@ function toggleFreeHallCheckbox() {
   }
 }
 
-if ($("room")) {
-  $("room").addEventListener("change", () => {
-    updateDefaultRoomPrice();
-    toggleFreeHallCheckbox();
-  });
-}
+/* Initialization */
+loadRememberedLogin();
+
+document.addEventListener("DOMContentLoaded", () => {
+  bindAllEvents();
+  if (sessionStorage.getItem("roomflow_logged_in") === "1") {
+    showApp();
+  } else {
+    showLogin();
+    render();
+  }
+});
