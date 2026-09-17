@@ -1859,6 +1859,12 @@ async function handleClientSubmit(event) {
   const clientId = "RF_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
   const formattedRoom = String(room).toLowerCase().includes("hall") ? roomDisplayName : `${room} (${roomType})`;
 
+      // Helper function: returns trimmed value or "-" if empty/missing
+  const getVal = id => {
+  const el = $(id);
+  return el && el.value.trim() !== "" ? el.value.trim() : "-";
+  };
+
   const payload = {
     action: "client_add",
     targetSheet: "Clients",
@@ -1869,7 +1875,7 @@ async function handleClientSubmit(event) {
     "His Mobile": $("hisMobile") ? $("hisMobile").value.trim() : "",
     "His Aadhaar Card Number": $("hisAadhar") ? $("hisAadhar").value.trim() : "",
     "Her Name 👧🏻": $("herName") ? $("herName").value.trim() : "",
-    "Her Mobile": $("herMobile") ? $("herMobile").value.trim() : "",
+    "Her Mobile": getVal("herMobile"),
     "Her Aadhaar Card Number": $("herAadhar") ? $("herAadhar").value.trim() : "",
     "Amount": finalPrice,
     "Mode of Payment": $("paymentMode") ? $("paymentMode").value : "",
@@ -1887,7 +1893,7 @@ async function handleClientSubmit(event) {
     hisAadhar: $("hisAadhar") ? $("hisAadhar").value.trim() : "",
     hisAadhaar: $("hisAadhar") ? $("hisAadhar").value.trim() : "",
     herName: $("herName") ? $("herName").value.trim() : "",
-    herMobile: $("herMobile") ? $("herMobile").value.trim() : "",
+    herMobile: getVal("herMobile"),
     herAadhar: $("herAadhar") ? $("herAadhar").value.trim() : "",
     herAadhaar: $("herAadhar") ? $("herAadhar").value.trim() : "",
     amount: amount,
