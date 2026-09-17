@@ -2,7 +2,7 @@ const CONFIG = {
   demoEmail: "abc@gmail.com",
   demoPassword: "Ab@12",
   rooms: 9,
-  saveWebhookUrl: "https://script.google.com/macros/s/AKfycbxZWB4WWybwPCz4ksZIhZRLJEuc0BZ81RrFeImgEAU3pHEtdb708Wmo2TXblvdfK3T6iw/exec",
+  saveWebhookUrl: "https://script.google.com/macros/s/AKfycbzezxgI0SxN5EiWGIE1J81VPe558QKRgx1-w0SxAcZQmp7Zbmu06rpLEP0f3AId2Iio/exec",
   resetWebhookUrl: "",
   admins: {
     "Praful@gmail.com": "Praful@12345",
@@ -99,7 +99,7 @@ let authenticatedAdmin = sessionStorage.getItem("roomflow_admin") || null;
 let clients = deduplicateClients(safeGetStorage("roomflow_clients", []));
 let pendingSync = safeGetStorage("roomflow_pending_sync", []);
 let staffList = safeGetStorage("roomflow_staff_list", [
-  { id: "STF_1", name: "Raju", role: "Staff Boy", mobile: "" }
+  //  { id: "STF_1", name: "Raju", role: "Staff Boy", mobile: "" }
 ]);
 let attendanceRecords = safeGetStorage("roomflow_attendance_records", {});
 let syncedAttendanceRecords = safeGetStorage("roomflow_synced_attendance", {});
@@ -616,8 +616,8 @@ function getCheckoutTime(client) {
   if (!durationNum || Number.isNaN(durationNum) || durationNum <= 0) return null;
 
   const unit = String(client.durationUnit || client.timeUnit || "Hour").toLowerCase();
-  let milliseconds = (unit === "day" || unit === "days") 
-    ? durationNum * 24 * 60 * 60 * 1000 
+  let milliseconds = (unit === "day" || unit === "days")
+    ? durationNum * 24 * 60 * 60 * 1000
     : durationNum * 60 * 60 * 1000;
 
   return new Date(start.getTime() + milliseconds);
@@ -792,8 +792,8 @@ function releaseRoom(roomNumber) {
       render();
 
       showPopup(
-        "success", 
-        "Room Available", 
+        "success",
+        "Room Available",
         `${roomDisplayName} is now available again.\n\nCheck-out Date & Time: ${checkoutDateFormatted}, ${checkoutTimeFormatted}`
       );
     }
@@ -862,9 +862,9 @@ function render() {
             ${displayDuration ? `${escapeHtml(displayDuration)} ${escapeHtml(client.durationUnit || client.timeUnit || "Hour")}` : "Duration not set"}
           </div>
           ${isFreeHall
-            ? `<div style="margin-top:16px;font-size:11px;color:#b080ff;text-align:center;font-weight:600;">Linked to ${escapeHtml(getRoomDisplayName(client.mainRoomNumber))}</div>`
-            : `<button type="button" class="ghost-btn room-key-btn" style="margin-top:16px;width:100%;font-size:11px;padding:9px 10px;" data-room-release="${escapeHtml(roomNumber)}">☑ Checkout</button>`
-          }
+          ? `<div style="margin-top:16px;font-size:11px;color:#b080ff;text-align:center;font-weight:600;">Linked to ${escapeHtml(getRoomDisplayName(client.mainRoomNumber))}</div>`
+          : `<button type="button" class="ghost-btn room-key-btn" style="margin-top:16px;width:100%;font-size:11px;padding:9px 10px;" data-room-release="${escapeHtml(roomNumber)}">☑ Checkout</button>`
+        }
           <div class="room-glow"></div>
         </div>
       `;
@@ -1026,12 +1026,12 @@ async function renderGuestList() {
   const rowsHtml = clients.map((client, index) => {
     const displayDuration = formatDurationDisplay(client.duration);
     const checkinDisplay = formatDateTimeDisplay(
-      client.checkinDateFormatted || client.checkinDate || client.date, 
-      client.checkinTimeFormatted || client.checkinTime, 
+      client.checkinDateFormatted || client.checkinDate || client.date,
+      client.checkinTimeFormatted || client.checkinTime,
       client.checkinDateTime
     );
     const checkoutDisplay = (client.status === "Occupied" || (!client.checkoutDateTime && (!client.checkoutDateFormatted || client.checkoutDateFormatted === "-")))
-      ? "Active (In Stay)" 
+      ? "Active (In Stay)"
       : formatDateTimeDisplay(client.checkoutDateFormatted || client.checkoutDate, client.checkoutTimeFormatted || client.checkoutTime, client.checkoutDateTime);
 
     const safeAmount = formatAmountDisplay(client.amount, client.finalPrice);
@@ -1101,12 +1101,12 @@ function viewClientDetails(index) {
 
   const displayDuration = formatDurationDisplay(client.duration);
   const checkinDisplay = formatDateTimeDisplay(
-    client.checkinDateFormatted || client.checkinDate || client.date, 
-    client.checkinTimeFormatted || client.checkinTime, 
+    client.checkinDateFormatted || client.checkinDate || client.date,
+    client.checkinTimeFormatted || client.checkinTime,
     client.checkinDateTime
   );
   const checkoutDisplay = (client.status === "Occupied" || (!client.checkoutDateTime && (!client.checkoutDateFormatted || client.checkoutDateFormatted === "-")))
-    ? "Active (In Stay)" 
+    ? "Active (In Stay)"
     : formatDateTimeDisplay(client.checkoutDateFormatted || client.checkoutDate, client.checkoutTimeFormatted || client.checkoutTime, client.checkoutDateTime);
 
   const safeAmount = formatAmountDisplay(client.amount, client.finalPrice);
@@ -1210,7 +1210,7 @@ function renderPricingTable() {
   `).join("");
 }
 
-window.editPriceRule = function(index) {
+window.editPriceRule = function (index) {
   const currentAdmin = authenticatedAdmin || sessionStorage.getItem("roomflow_admin");
   if (currentAdmin) {
     openPriceModal(index);
@@ -1222,7 +1222,7 @@ window.editPriceRule = function(index) {
   }
 };
 
-window.deletePriceRule = function(index) {
+window.deletePriceRule = function (index) {
   if (index < 0 || index >= pricingRules.length) return;
   const rule = pricingRules[index];
   showPopup("warning", "Delete Price Rule", `Are you sure you want to delete the price rule for ${rule.roomType} (${rule.hours} Hours)?`, () => {
@@ -1458,7 +1458,7 @@ function renderStaffAttendanceSheet() {
   `;
 }
 
-window.cycleAttendanceStatus = function(staffId, dateKey) {
+window.cycleAttendanceStatus = function (staffId, dateKey) {
   if (!attendanceRecords[dateKey]) attendanceRecords[dateKey] = {};
 
   const current = attendanceRecords[dateKey][staffId] || "";
@@ -1486,13 +1486,25 @@ window.cycleAttendanceStatus = function(staffId, dateKey) {
   renderStaffAttendanceSheet();
 };
 
-window.saveStaffAttendance = async function(staffId) {
+window.saveStaffAttendance = async function (staffId) {
   const staffObj = staffList.find(s => String(s.id) === String(staffId));
   if (!staffObj) return;
 
   const daysCount = getDaysInMonth(currentAttendanceYear, currentAttendanceMonth);
   const recordsToSync = [];
   const staffMobile = staffObj.mobile ? String(staffObj.mobile).trim() : "";
+
+  // 1. Extract name from logged-in user email (e.g., Praful@gmail.com -> Praful)
+  const loginUser = authenticatedAdmin || sessionStorage.getItem("roomflow_admin") || "";
+  const loginName = loginUser ? loginUser.split("@")[0] : "Admin";
+  const actionType = `Attendance marked by ${loginName}`;
+
+  // 2. Automatically generate current time in HH:mm format (e.g. 20:59)
+  const timeFormatted = new Date().toLocaleTimeString("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+
 
   for (let day = 1; day <= daysCount; day++) {
     const monthStr = String(currentAttendanceMonth + 1).padStart(2, '0');
@@ -1521,8 +1533,11 @@ window.saveStaffAttendance = async function(staffId) {
         staffMobile: staffMobile,
         mobileNumber: staffMobile,
         date: dateKey,
+        time: timeFormatted,
         status: status,
-        details: status
+        details: status,
+        actionType: actionType
+
       });
     }
   }
@@ -1570,7 +1585,7 @@ window.saveStaffAttendance = async function(staffId) {
   }
 };
 
-window.editStaffMember = function(staffId) {
+window.editStaffMember = function (staffId) {
   const staff = staffList.find(s => String(s.id) === String(staffId));
   if (!staff) return;
   const currentAdmin = authenticatedAdmin || sessionStorage.getItem("roomflow_admin");
@@ -1584,7 +1599,7 @@ window.editStaffMember = function(staffId) {
   }
 };
 
-window.deleteStaffMember = function(staffId) {
+window.deleteStaffMember = function (staffId) {
   const staff = staffList.find(s => String(s.id) === String(staffId));
   if (!staff) return;
 
@@ -1899,8 +1914,8 @@ async function handleClientSubmit(event) {
 
     const freeHallText = includeFreeHall ? "\n🎉 Complimentary Birthday Hall Reserved" : "";
     showPopup(
-      "success", 
-      "Client Saved Successfully", 
+      "success",
+      "Client Saved Successfully",
       `The client has been successfully checked in.\n\nAllotted Room: ${roomDisplayName}\nRoom Type: ${roomType}${freeHallText}\nCheck-in Date & Time: ${checkinDateFormatted}, ${checkinTimeFormatted}\nDuration: ${duration} ${durationUnit}`
     );
   } catch (error) {
@@ -1914,8 +1929,8 @@ async function handleClientSubmit(event) {
     startCountdownTimer();
 
     showPopup(
-      "success", 
-      "Client Saved Locally", 
+      "success",
+      "Client Saved Locally",
       `Client checked in locally.\n\nAllotted Room: ${roomDisplayName}\nRoom Type: ${roomType}\nData will auto-sync once internet connection stabilizes.`
     );
   } finally {
@@ -1988,6 +2003,42 @@ function handleStaffFormSubmit(event) {
   renderStaffAttendanceSheet();
   closeStaffModal();
   showPopup("success", "Staff Saved", `Staff member "${name}" saved successfully.`);
+}
+
+function openStaffModal(staffObj = null) {
+  const overlay = $("staffModalOverlay");
+  if (!overlay) return;
+
+  const deleteBtn = $("deleteStaffModalBtn");
+
+  if (staffObj) {
+    $("staffModalTitle").textContent = "Edit Staff Member";
+    $("staffIdInput").value = staffObj.id;
+    $("staffNameInput").value = staffObj.name;
+    $("staffRoleInput").value = staffObj.role;
+    $("staffMobileInput").value = staffObj.mobile || "";
+
+    if (deleteBtn) {
+      deleteBtn.classList.remove("hidden");
+      deleteBtn.onclick = () => window.deleteStaffMember(staffObj.id);
+    }
+  } else {
+    $("staffModalTitle").textContent = "Add Staff Member";
+    $("staffIdInput").value = "";
+    $("staffNameInput").value = "";
+    $("staffRoleInput").value = "Housekeeping";
+    $("staffMobileInput").value = "";
+
+    if (deleteBtn) deleteBtn.classList.add("hidden");
+  }
+
+  overlay.classList.remove("hidden");
+}
+
+function closeStaffModal() {
+  const overlay = $("staffModalOverlay");
+  if (overlay) overlay.classList.add("hidden");
+  if ($("staffForm")) $("staffForm").reset();
 }
 
 function bindAllEvents() {
@@ -2160,7 +2211,7 @@ function toggleFreeHallCheckbox() {
 
   container.classList.remove("hidden");
 
-  const isHallBusy = clients.some(client => 
+  const isHallBusy = clients.some(client =>
     client.status === "Occupied" && (String(client.room) === "Hall" || client.includeFreeHall)
   );
 
