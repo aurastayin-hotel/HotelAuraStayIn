@@ -2,7 +2,7 @@ const CONFIG = {
   demoEmail: "abc@gmail.com",
   demoPassword: "Ab@12",
   rooms: 9,
-  saveWebhookUrl: "https://script.google.com/macros/s/AKfycbzezxgI0SxN5EiWGIE1J81VPe558QKRgx1-w0SxAcZQmp7Zbmu06rpLEP0f3AId2Iio/exec",
+  saveWebhookUrl: "https://script.google.com/macros/s/AKfycbwo-TpyIyOsHaHB4yPfwxdf805Q7S06uNj6B5KmDrqaXUry35kDkAxREc-6J8i4Egr3/exec",
   resetWebhookUrl: "",
   admins: {
     "Praful@gmail.com": "Praful@12345",
@@ -98,9 +98,7 @@ function deduplicateClients(records) {
 let authenticatedAdmin = sessionStorage.getItem("roomflow_admin") || null;
 let clients = deduplicateClients(safeGetStorage("roomflow_clients", []));
 let pendingSync = safeGetStorage("roomflow_pending_sync", []);
-let staffList = safeGetStorage("roomflow_staff_list", [
-  //  { id: "STF_1", name: "Raju", role: "Staff Boy", mobile: "" }
-]);
+let staffList = safeGetStorage("roomflow_staff_list", []);
 let attendanceRecords = safeGetStorage("roomflow_attendance_records", {});
 let syncedAttendanceRecords = safeGetStorage("roomflow_synced_attendance", {});
 let pendingAttendanceChanges = safeGetStorage("roomflow_pending_attendance_changes", {});
@@ -117,7 +115,7 @@ let isSyncing = false;
 
 try {
   localStorage.setItem("roomflow_clients", JSON.stringify(clients));
-} catch (e) {}
+} catch (e) { }
 
 function getToday() {
   return new Date().toISOString().slice(0, 10);
@@ -138,14 +136,16 @@ function escapeHtml(value) {
 function calculateFinalPrice() {
   const amountInput = $("amount");
   const discountInput = $("discount");
+  const additionalChargesInput = $("additionalCharges");
   const finalPriceInput = $("finalPrice");
 
   if (!amountInput || !finalPriceInput) return;
 
   const amount = parseFloat(amountInput.value) || 0;
-  const discount = parseFloat(discountInput ? discountInput.value : 0) || 0;
-  const finalPrice = Math.max(0, amount - discount);
+  const discount = parseFloat(discountInput?.value) || 0;
+  const additionalCharges = parseFloat(additionalChargesInput?.value) || 0;
 
+  const finalPrice = Math.max(0, amount + additionalCharges - discount);
   finalPriceInput.value = amount > 0 ? finalPrice : "";
 }
 
@@ -184,7 +184,7 @@ function formatDateTimeDisplay(dateStr, timeStr, isoStr) {
         const timePart = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
         return `${datePart}, ${timePart}`;
       }
-    } catch (e) {}
+    } catch (e) { }
   }
 
   if (dateStr && dateStr !== "-" && dateStr !== "") {
@@ -194,7 +194,7 @@ function formatDateTimeDisplay(dateStr, timeStr, isoStr) {
       if (!Number.isNaN(d.getTime()) && d.getFullYear() > 1990) {
         formattedDate = d.toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" });
       }
-    } catch (e) {}
+    } catch (e) { }
 
     if (timeStr && timeStr !== "-" && timeStr !== "" && !timeStr.includes("-")) {
       return `${formattedDate}, ${timeStr}`;
@@ -241,10 +241,7 @@ async function syncPendingData() {
 window.addEventListener("online", syncPendingData);
 setInterval(syncPendingData, 10000);
 
-/* ============================================================
-   CONTINUOUS AUDIO & VOICEOVER NOTIFICATION SYSTEM
-   ============================================================ */
-
+/* AUDIO & VOICEOVER NOTIFICATION SYSTEM */
 let voiceoverLoopInterval = null;
 
 function playNotificationChime() {
@@ -384,7 +381,7 @@ function closePopup() {
   }
 }
 
-/* Update Admin Navigation Button Visibility */
+/* Admin Visibility */
 function updateAdminVisibility() {
   const isAdmin = Boolean(authenticatedAdmin || sessionStorage.getItem("roomflow_admin"));
   const btn = $("roomPriceNavBtn");
@@ -479,7 +476,7 @@ function loadRememberedLogin() {
 
     const checkbox = $("rememberPassword");
     if (checkbox) checkbox.checked = true;
-  } catch (e) {}
+  } catch (e) { }
 }
 
 /* Admin Auth Modal */
@@ -582,7 +579,7 @@ async function executeMasterReset(adminUsername) {
   );
 }
 
-/* COUNTDOWN LOGIC */
+/* COUNTDOWN & OVERTIME LOGIC */
 let notifiedExpiredRooms = new Set();
 
 function formatCountdown(milliseconds) {
@@ -627,7 +624,24 @@ function getClientCountdown(client) {
   const checkout = getCheckoutTime(client);
   if (!checkout) return { text: "No countdown", isOverdue: false, remainingMs: 0 };
 
-  const remaining = checkout.getTime() - Date.now();
+  // Calculate reference time: for Checked Out guests use logged checkout time, for Occupied guests use Date.now()
+  let refTime = Date.now();
+  if (client.status === "Checked Out") {
+    if (client.checkoutDateTime) {
+      const d = new Date(client.checkoutDateTime);
+      if (!Number.isNaN(d.getTime())) refTime = d.getTime();
+    } else {
+      const dFallback = parseDateTimeFallback(
+        client.checkoutDateFormatted || client.checkoutDate,
+        client.checkoutTimeFormatted || client.checkoutTime
+      );
+      if (dFallback && !Number.isNaN(dFallback.getTime())) {
+        refTime = dFallback.getTime();
+      }
+    }
+  }
+
+  const remaining = checkout.getTime() - refTime;
 
   if (remaining <= 0) {
     return {
@@ -1110,6 +1124,15 @@ function viewClientDetails(index) {
     : formatDateTimeDisplay(client.checkoutDateFormatted || client.checkoutDate, client.checkoutTimeFormatted || client.checkoutTime, client.checkoutDateTime);
 
   const safeAmount = formatAmountDisplay(client.amount, client.finalPrice);
+  
+  // Compute overtime details for this specific guest
+  const countdownInfo = getClientCountdown(client);
+
+  // Render Overtime field ONLY if overtime counter has started / overdue
+  const overtimeHtml = countdownInfo.isOverdue
+    ? `<small style="color: var(--muted); display: block; margin-bottom: 3px; margin-top: 10px;">Overtime</small>
+       <strong style="color: #ff4d4d;"> +${escapeHtml(formatCountdown(countdownInfo.remainingMs))} ⚠️ </strong>`
+    : '';
 
   content.innerHTML = `
     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; font-size: 13px;">
@@ -1133,11 +1156,25 @@ function viewClientDetails(index) {
       <div style="background: rgba(255,255,255,.04); padding: 12px; border-radius: 12px; border: 1px solid var(--border);">
         <small style="color: var(--muted); display: block; margin-bottom: 3px;">Stay Duration</small>
         <strong>${escapeHtml(displayDuration || "-")} ${escapeHtml(client.durationUnit || client.timeUnit || "Hour")}</strong>
+        
+        ${overtimeHtml}
       </div>
-      <div style="background: rgba(255,255,255,.04); padding: 12px; border-radius: 12px; border: 1px solid var(--border);">
-        <small style="color: var(--muted); display: block; margin-bottom: 3px;">Amount Paid</small>
-        <strong>₹${escapeHtml(safeAmount)} (${escapeHtml(client.paymentMode || "-")})</strong>
+      
+      <div style="background: rgba(255,255,255,.04); padding: 12px; border-radius: 12px; border: 1px solid var(--border);"> 
+        <small style="color: var(--muted); display: block; margin-bottom: 8px;"> Amount Paid </small> 
+        <div style="font-size: 13px; color: #d8e1ee; font-weight: 700; margin-bottom: 8px;"> ₹${escapeHtml(safeAmount)} (${escapeHtml(client.paymentMode || "-")}) </div> 
+      
+        <div style="font-size: 10px; color: #d8e1ee; display: flex; justify-content: space-between; align-items: center; margin-top: 8px;"> 
+          <span>Discount (₹)</span> 
+          <span style="font-weight: 200;">${escapeHtml(client.discount || 0)} ₹</span> 
+        </div> 
+      
+        <div style="font-size: 10px; color: #d8e1ee; display: flex; justify-content: space-between; align-items: center; margin-top: 6px;"> 
+          <span>Additional Charges (₹)</span> 
+          <span style="font-weight: 200;">${escapeHtml(client.additionalCharges || 0)} ₹</span> 
+        </div> 
       </div>
+
       <div style="grid-column: 1 / -1; background: rgba(255,255,255,.04); padding: 14px; border-radius: 12px; border: 1px solid var(--border);">
         <strong style="color: #8ea7ff; display: block; margin-bottom: 8px;">His Details 👦🏻</strong>
         <div><strong>Name:</strong> ${escapeHtml(client.hisName || "-")}</div>
@@ -1297,10 +1334,7 @@ function updateDefaultRoomPrice() {
   calculateFinalPrice();
 }
 
-/* ============================================================
-   STAFF ATTENDANCE MANAGEMENT SYSTEM (ADMIN ONLY)
-   ============================================================ */
-
+/* STAFF ATTENDANCE SYSTEM */
 let currentAttendanceYear = new Date().getFullYear();
 let currentAttendanceMonth = new Date().getMonth();
 
@@ -1365,7 +1399,6 @@ function renderStaffAttendanceSheet() {
   let grandTotalP = 0;
   let grandTotalAbsents = 0;
 
-  // Generate Table Headers
   let dayHeadersHtml = "";
   for (let day = 1; day <= daysCount; day++) {
     const dObj = new Date(currentAttendanceYear, currentAttendanceMonth, day);
@@ -1494,17 +1527,14 @@ window.saveStaffAttendance = async function (staffId) {
   const recordsToSync = [];
   const staffMobile = staffObj.mobile ? String(staffObj.mobile).trim() : "";
 
-  // 1. Extract name from logged-in user email (e.g., Praful@gmail.com -> Praful)
   const loginUser = authenticatedAdmin || sessionStorage.getItem("roomflow_admin") || "";
   const loginName = loginUser ? loginUser.split("@")[0] : "Admin";
   const actionType = `Attendance marked by ${loginName}`;
 
-  // 2. Automatically generate current time in HH:mm format (e.g. 20:59)
   const timeFormatted = new Date().toLocaleTimeString("en-GB", {
     hour: "2-digit",
     minute: "2-digit"
   });
-
 
   for (let day = 1; day <= daysCount; day++) {
     const monthStr = String(currentAttendanceMonth + 1).padStart(2, '0');
@@ -1537,7 +1567,6 @@ window.saveStaffAttendance = async function (staffId) {
         status: status,
         details: status,
         actionType: actionType
-
       });
     }
   }
@@ -1662,7 +1691,7 @@ function openStaffModal(staffObj = null) {
     $("staffModalTitle").textContent = "Add Staff Member";
     $("staffIdInput").value = "";
     $("staffNameInput").value = "";
-    $("staffRoleInput").value = "Staff Boy";
+    $("staffRoleInput").value = "Housekeeping";
     $("staffMobileInput").value = "";
 
     if (deleteBtn) deleteBtn.classList.add("hidden");
@@ -1818,7 +1847,8 @@ async function handleClientSubmit(event) {
   const durationUnit = $("durationUnit") ? $("durationUnit").value : "Hour";
   const amount = Number($("amount").value) || 0;
   const discount = $("discount") ? Number($("discount").value) || 0 : 0;
-  const finalPrice = Math.max(0, amount - discount);
+  const additionalCharges = $("additionalCharges") ? Number($("additionalCharges").value) || 0 : 0;
+  const finalPrice = Math.max(0, amount + additionalCharges - discount);
   const roomType = getRoomType(room);
 
   const now = new Date();
@@ -1834,7 +1864,6 @@ async function handleClientSubmit(event) {
     targetSheet: "Clients",
     id: clientId,
 
-    // Exact Header-Matched Keys for Google Sheets Mapping (16 columns)
     "Sr No": clients.length + 1,
     "His Name 👦🏻": $("hisName") ? $("hisName").value.trim() : "",
     "His Mobile": $("hisMobile") ? $("hisMobile").value.trim() : "",
@@ -1852,7 +1881,6 @@ async function handleClientSubmit(event) {
     "Check-Out-Date": "-",
     "Check-Out-Time": "-",
 
-    // Standardized Property Keys
     srNo: clients.length + 1,
     hisName: $("hisName") ? $("hisName").value.trim() : "",
     hisMobile: $("hisMobile") ? $("hisMobile").value.trim() : "",
@@ -1862,7 +1890,8 @@ async function handleClientSubmit(event) {
     herMobile: $("herMobile") ? $("herMobile").value.trim() : "",
     herAadhar: $("herAadhar") ? $("herAadhar").value.trim() : "",
     herAadhaar: $("herAadhar") ? $("herAadhar").value.trim() : "",
-    amount: finalPrice,
+    amount: amount,
+    additionalCharges: additionalCharges,
     finalPrice: finalPrice,
     paymentMode: $("paymentMode") ? $("paymentMode").value : "",
     checkinDate: checkinDateFormatted,
@@ -2041,6 +2070,8 @@ function closeStaffModal() {
   if ($("staffForm")) $("staffForm").reset();
 }
 
+
+
 function bindAllEvents() {
   document.querySelectorAll(".nav-item").forEach(button => {
     button.onclick = () => navigate(button.dataset.section);
@@ -2144,6 +2175,12 @@ function bindAllEvents() {
     $("amount").oninput = calculateFinalPrice;
     $("amount").onkeyup = calculateFinalPrice;
   }
+
+  if ($("additionalCharges")) {
+    $("additionalCharges").oninput = calculateFinalPrice;
+    $("additionalCharges").onkeyup = calculateFinalPrice;
+  }
+
   if ($("discount")) {
     $("discount").oninput = calculateFinalPrice;
     $("discount").onkeyup = calculateFinalPrice;
