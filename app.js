@@ -5,9 +5,9 @@ const CONFIG = {
   saveWebhookUrl: "https://script.google.com/macros/s/AKfycbzezxgI0SxN5EiWGIE1J81VPe558QKRgx1-w0SxAcZQmp7Zbmu06rpLEP0f3AId2Iio/exec",
   resetWebhookUrl: "",
   admins: {
-    "Praful@gmail.com": "Praful@12345",
-    "Rakesh@gmail.com": "Rakesh@12345",
-    "Akshay@gmail.com": "Akshay@12345"
+    "praful@gmail.com": "Praful@12345",
+    "rakesh@gmail.com": "Rakesh@12345",
+    "akshayy@gmail.com": "Akshayy@12345"
   },
   roomList: [
     { number: "101", name: "Room 101", type: "AC" },
